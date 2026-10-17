@@ -1,0 +1,23 @@
+body{--character-sheet:url('../assets/xiaojiu-expressions.png');--character-serious:url('../assets/xiaojiu-serious.webp')}
+body[data-character=xiaoxiaojiu]{--character-sheet:url('../assets/characters/xiaoxiaojiu/expressions.webp');--character-serious:url('../assets/characters/xiaoxiaojiu/serious.webp')}
+.character-sprite{background-image:var(--character-sheet)}
+.character-sprite[data-face=serious]{background-image:var(--character-serious)}
+.mood-avatar[data-character=xiaoxiaojiu]{background-image:url('../assets/characters/xiaoxiaojiu/moods.webp')}
+.utility-dialog[data-view=characters]{width:min(660px,94vw);max-height:94dvh;overflow:hidden}
+.utility-dialog[data-view=characters][open]{display:flex;flex-direction:column}
+.utility-dialog[data-view=characters] .dialog-heading{position:static;flex:none;padding:16px 22px}
+.utility-dialog[data-view=characters] .dialog-heading h2{margin:0;font-size:18px}
+.utility-dialog[data-view=characters] #utilityContent{padding:18px 22px;min-height:0;overflow-y:auto;line-height:1.7;scrollbar-gutter:stable}
+.utility-dialog[data-view=characters] #utilityContent>p{margin:0 0 14px}
+.character-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.character-card{display:grid;justify-items:center;gap:8px;min-width:0;padding:12px 10px;border:1px solid #cbded1;border-radius:12px;background:#fff;color:#3d644b;cursor:pointer}
+.character-card[aria-pressed=true]{background:#edf6ef;border-color:#4d805e;box-shadow:inset 0 0 0 2px #4d805e}
+.character-preview{display:block;width:100%;max-width:230px;aspect-ratio:1;background-size:300% 200%;background-position:0% 0%;animation:none;pointer-events:none}
+.character-card[data-character=xiaojiu] .character-preview{background-image:url('../assets/xiaojiu-expressions.png')}
+.character-card[data-character=xiaoxiaojiu] .character-preview{background-image:url('../assets/characters/xiaoxiaojiu/expressions.webp')}
+.character-card strong{font-size:18px;line-height:1.4}
+.character-card small{font-size:11px;min-height:19px;color:#63836d}
+.utility-dialog[data-view=characters] .dialog-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.utility-dialog[data-view=characters] .dialog-actions button{margin:0!important}
+.character-switch-hint{display:block;font-size:10px;color:#6d8877;text-align:center;margin-top:4px;line-height:1.6}
+@media(max-width:650px){.utility-dialog[data-view=characters] #utilityContent{padding:16px}.utility-dialog[data-view=characters] .dialog-heading{padding:13px 16px}.character-choices{gap:10px}.character-card{padding:10px 6px}.character-card strong{font-size:16px}}
