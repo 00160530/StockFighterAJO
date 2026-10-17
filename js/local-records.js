@@ -1,0 +1,1 @@
+(function(root){'use strict';function clear(storage){const keys=[];for(let i=0;i<storage.length;i++){const key=storage.key(i);if(key?.startsWith('taigu-warrior.'))keys.push(key);}for(const key of keys)storage.removeItem(key);return keys.length;}root.TaiguLocalRecords={clear};})(globalThis);

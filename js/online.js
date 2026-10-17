@@ -19,7 +19,9 @@ class Client{
  async submit(r,name,avatarId=1){const eligible=this.eligibility(r);if(!eligible.ok)throw new CloudError(eligible.reason,eligible.submitted?'ALREADY_SUBMITTED':'INELIGIBLE');const p=await this.identity();let result;try{result=await this.request('/v1/scores',payload(r,this.session(r.id),this.config,name,avatarId),p.playerToken);}catch(e){if(e.code==='SESSION_USED'&&e.receipt)result=e.receipt;else throw e;}const a=this.read();a.receipts[r.id]=result;a.nickname=name;a.avatarId=avatarId;this.write(a);return result;}
  async leaderboard(mode,metric,financing='cash'){return this.request('/v1/leaderboard?mode='+encodeURIComponent(mode)+'&metric='+encodeURIComponent(metric)+'&financing='+encodeURIComponent(financing));}
  async rank(mode,metric,financing='cash'){const p=this.read().player;if(!p?.playerToken)return {entry:null};return this.request('/v1/rank?mode='+encodeURIComponent(mode)+'&metric='+encodeURIComponent(metric)+'&financing='+encodeURIComponent(financing),null,p.playerToken);}
- async announcement(){return this.request('/v1/announcement');}
+ async share(record,requestId){const p=await this.identity();return this.request('/v1/shares',{requestId,record},p.playerToken);}
+  async sharedRecord(id){return this.request('/v1/shares/'+encodeURIComponent(id));}
+  async announcement(){return this.request('/v1/announcement');}
  async feedback(body){const p=await this.identity();return this.request('/v1/feedback',body,p.playerToken);}
 }
 root.TaiguOnline={KEY,CloudError,Client,payload};

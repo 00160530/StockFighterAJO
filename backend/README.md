@@ -42,3 +42,15 @@ node node_modules/wrangler/bin/wrangler.js deploy
 後台未登入不能讀取回報；一般玩家不能修改、刪除他人成績。管理員下架保留原資料與稽核。遊戲使用基本檢核而非伺服器重新計分，限制詳見 [LEADERBOARD.md](../docs/LEADERBOARD.md)。
 
 GitHub Actions 僅測試和發布前端，Worker 部署由 Wrangler 執行。build-pages.mjs 只複製 index.html、.nojekyll、assets、css、data、js；backend、node_modules、私密設定均不進入 Pages。
+
+## 0.12.0 管理功能
+
+`GET /admin/api/runs` 接受 `q`（暱稱部分字串）、`id`（成績完整編號）、`status=all|active|revoked`、`mode=all|life|free`、`financing=all|cash|margin`、`sort=latest|score|equity|duration|trades`、`page`（從 0 起，每頁 50 筆）。LIKE 特殊字元作為字面字元，排序使用白名單，所有值皆為參數綁定。
+
+`POST /admin/api/runs/:id/hide` 註銷；`POST /admin/api/runs/:id/restore` 恢復。皆須 2–500 字原因、管理 cookie、同源 Origin 與 X-Admin-Action。使用 D1 batch 原子更新成績、重選該玩家與版本的三種最佳成績，並留下稽核紀錄，不刪除原始成績。
+
+回報狀態增加 `ignored`（不處理）。0007 以 not_handled 旗標保留原狀態 CHECK 與舊資料；對外狀態及計數由 API 導出，與已結案分開。回報列表回傳所有狀態總數 `counts`，不受當前篩選及頁數影響。
+
+## 玩家分享紀錄
+
+0008 新增 `sf_shared_records`，儲存玩家主動分享的顯示 JSON。`POST /v1/shares` 需匿名玩家 token、requestId 與白名單紀錄，按玩家與 IP 限頻，重試同 requestId 回傳同一份不可變紀錄。`GET /v1/shares/:id` 公開回傳顯示紀錄，不回傳玩家 ID、requestId 或 token；分享不寫入排行榜。遊戲連結使用 `?record=<id>`，直接開啟「你朋友股神的紀錄」。

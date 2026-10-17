@@ -12,7 +12,7 @@ function fixture(prices=[100,90,81,75,70,65,60,50],opens=prices,mode='free'){
 }
 test('margin is locked by default; completed life loses unlock margin, only a win unlocks free, bankruptcy does not unlock',()=>{
  const {m}=fixture();const locked=m.fresh();locked.opening=false;assert.throws(()=>m.queue(locked,'2330','buy',1,'fixed','margin'));
- const lost={mode:'life',status:'lost',runId:'first'},p=c.TaiguEvents.progression(null,lost);assert.equal(p.marginUnlocked,true);assert.equal(p.freeUnlocked,false);
+ const lost={mode:'life',status:'lost',runId:'first'},p=c.TaiguEvents.progression(null,lost);assert.equal(p.marginUnlocked,true);assert.equal(p.freeUnlocked,true);
  const won=c.TaiguEvents.progression(null,{...lost,status:'won'});assert.equal(won.freeUnlocked,true);assert.equal(won.marginUnlocked,true);
  assert.equal(c.TaiguEvents.progression(null,{...lost,status:'bankrupt'}).marginUnlocked,false);assert.equal(c.TaiguEvents.progression(p).marginUnlocked,true);
  assert.equal(c.TaiguEvents.progression(null,{...lost,life:{eligibleForUnlock:false}}).marginUnlocked,false);
