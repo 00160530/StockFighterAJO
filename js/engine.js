@@ -78,6 +78,7 @@ function createMarket(data){
  function choose(s,event,choice){if(s.activeEvent!==event.id)throw Error('劇情狀態不符');if(!event.choices.includes(choice))throw Error('未知的劇情選項');if(choice.cost)spend(s,choice.cost);s.stress=Math.max(0,Math.min(100,s.stress+(choice.stress||0)));s.seen.push(event.id);s.activeEvent=null;record(s,'story',`${event.title}／${choice.label}${choice.cost?'（支出 '+choice.cost+' 元）':''}`);}
  function trigger(s,events){if(s.activeEvent||s.status!=='playing'||s.opening)return;const d=date(s);const e=events.find(e=>!s.seen.includes(e.id)&&(e.exact?e.date===d:e.date<=d)&&(!e.until||d<=e.until)&&(!e.when||e.when(s)));if(e){s.activeEvent=e.id;openWindow(s,e.id);}}
  function validate(raw){
+  if(raw?.tutorialPending!==undefined&&typeof raw.tutorialPending!=='boolean')throw Error('存檔教學狀態不正確');
   if(!raw||raw.version!==VERSION||raw.datasetEnd!==data.end)throw Error('存檔版本或資料範圍不相容');
   if(raw.mode!==undefined&&!['life','free'].includes(raw.mode))throw Error('存檔模式不正確');
   if(raw.mode==='life'){const l=raw.life;if(!l||!Number.isInteger(l.until)||!Number.isInteger(l.openedAt)||l.openedAt< -1||l.openedAt>raw.day||l.until< -1||l.until>=data.calendar.length||l.until>raw.day+2||!Number.isSafeInteger(l.windows)||l.windows<0||!(l.anchorId===null||typeof l.anchorId==='string'))throw Error('存檔操作期不正確');}

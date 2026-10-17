@@ -15,6 +15,11 @@ function syncEvent(){market.trigger(state,story.events);eventSystem.ensureChat(s
 let screen='title',previewMode=null,book={version:1,runs:[]},recordSignature='';
 const music=new TaiguMusic.Player(updateMusicUI);
 const chart=new TaiguChart($('marketChart'),$('chartTooltip'),market);
+let tutorialProfile=TaiguTutorial.profile(null);try{tutorialProfile=TaiguTutorial.profile(JSON.parse(localStorage.getItem(KEY+'.tutorial')||'null'));}catch{}
+const tutorial=new TaiguTutorial.Tour({dialog:$('tutorialDialog'),onStep:step=>{$('gameMenu').open=['menu','free-menu'].includes(step?.id);},onEnd:finishTutorial});
+function tutorialLocked(){return tutorial.active||TaiguTutorial.needs(state,tutorialProfile);}
+async function showTutorial(required=false){if(tutorial.active)return;playback.stop();if(busy)await new Promise(resolve=>setTimeout(resolve,0));tutorial.start(state.mode,required||TaiguTutorial.needs(state,tutorialProfile));render();}
+function finishTutorial(finished){if(finished){tutorialProfile=TaiguTutorial.complete(tutorialProfile,state.mode);writeStorage(KEY+'.tutorial',tutorialProfile);delete state.tutorialPending;save();}render();if(finished&&state.mode==='life'&&state.day<0&&screen==='game')advance(1);}
 function notify(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4200);}
 function beep(kind='click'){music.sfx(kind);}
 function identify(s){if(typeof s.runId!=='string'||s.runId.length>120)s.runId=window.crypto?.randomUUID?.()||'run-'+Date.now()+'-'+Math.random().toString(36).slice(2);return s;}
@@ -45,8 +50,8 @@ function render(resetChart=false){
  const chapter=[...story.events].reverse().find(ev=>ev.type==='main'&&ev.date<=d);$('chapterLabel').textContent=chapter?chapter.chapter:'PROLOGUE / 重新上市';
  renderStory();renderTrade();renderPortfolio();chart.update(state,selected,resetChart);
  $('nextDate').textContent=data.calendar[state.day+1]?.replaceAll('-','.')||'已到資料終點';$('nextBtn').innerHTML=(state.day<0?'迎接第一次開盤':state.status==='playing'?'前往下一個交易日':'本輪已結算')+' <span>→</span>';
- for(const id of ['nextBtn','weekBtn','monthBtn'])$(id).disabled=busy||state.status!=='playing'||!!state.activeEvent;
- const life=state.mode==='life';$('weekBtn').hidden=life;$('monthBtn').hidden=life;$('lifeSkipBtn').hidden=!life||busy||!market.canTrade(state);$('playbackControls').hidden=!life;$('pausePlayback').hidden=!life||!busy;$('lifeSkipBtn').disabled=busy||state.status!=='playing'||!!state.activeEvent;
+ for(const id of ['nextBtn','weekBtn','monthBtn'])$(id).disabled=busy||tutorialLocked()||state.status!=='playing'||!!state.activeEvent;
+ const life=state.mode==='life';$('weekBtn').hidden=life;$('monthBtn').hidden=life;$('lifeSkipBtn').hidden=!life||busy||!market.canTrade(state);$('playbackControls').hidden=!life;$('pausePlayback').hidden=!life||!busy;$('lifeSkipBtn').disabled=busy||tutorialLocked()||state.status!=='playing'||!!state.activeEvent;
  $('advanceLabel').textContent=life?'事件操作期':'下一個交易日';
  if(life){const open=market.canTrade(state),left=Math.max(0,state.life.until-state.day+1);$('nextDate').textContent=state.activeEvent?'先完成劇情選擇':open?'剩 '+left+' 個操作日 · 至 '+data.calendar[state.life.until].replaceAll('-','/'):(playbackPaused?'播放已暫停 · 可繼續':'自動逐日播放至下一事件');$('nextBtn').textContent=busy?'行情播放中…':state.status!=='playing'?'本輪已結算':open&&left>1?'前往下一操作日 →':(playbackPaused?'繼續前往事件 ▷':'播放至下一事件 ▷');$('advanceHint').textContent='事件當日＋後兩個交易日可下單；次日開盤成交。';}else $('advanceHint').textContent='自由逐日操作；快轉遇事件自動停下。';
  $('coverage').textContent=`真實歷史 ${data.start.replaceAll('-','/')}—${data.end.replaceAll('-','/')} · 本機存檔`;
@@ -60,7 +65,7 @@ function renderStory(){
  const ev=story.events.find(e=>e.id===state.activeEvent);
  $('storyChoices').innerHTML='';
  if(ev){$('storySpeaker').textContent=ev.speaker;$('storyTag').textContent=ev.tag;$('storyTitle').textContent=ev.title;$('storyText').textContent=eventSystem.textFor(ev,state);$('storyHint').innerHTML=ev.newsId?'<button id="currentNewsBtn">新聞事實與來源 ↗</button><span>完成選擇後可操作股票</span>':'<span>完成選擇後，才能繼續推進時間。</span>';if(ev.newsId)$('currentNewsBtn').onclick=()=>showNews(ev.newsId);
-  ev.choices.forEach(choice=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=choice.label;btn.disabled=(choice.cost||0)>state.cash;btn.onclick=()=>{try{market.choose(state,ev,choice);lastReply=choice.reply;beep();changed();if(choice.openGroup)showGroup();}catch(e){notify(e.message);}};$('storyChoices').append(btn);});
+  ev.choices.forEach(choice=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=choice.label;btn.disabled=tutorialLocked()||(choice.cost||0)>state.cash;btn.onclick=()=>{if(tutorialLocked())return;try{market.choose(state,ev,choice);lastReply=choice.reply;beep();changed();if(choice.openGroup)showGroup();}catch(e){notify(e.message);}};$('storyChoices').append(btn);});
  }else{$('storySpeaker').textContent='小韭';$('storyTag').textContent='內心獨白・下一步由你決定';$('storyTitle').textContent=state.day<0?'一百萬，不是一串數字。':state.orders.length?'下好委託，也放下手機。':'市場還在，先想清楚。';$('storyText').textContent=lastReply||(state.day<0?'那是五年不敢亂花的薪水。上一輪，我把決定交給群組。這一輪，先學著把決定拿回來。':'看過價格，記下理由。今天不交易，也是一種決定。');$('storyHint').textContent=state.mode==='life'?'操作期結束後自動逐日播放，到下一事件停下。':'群組台詞為原創，新聞依當時已公開資料解鎖。';}
  const lead=market.equity(state,market.date(state))-market.equity(state.benchmark,market.date(state));
  const emotion=ev&&/恐懼|風險|錯失/.test(ev.tag)?2:state.stress>60?3:state.day<0?0:lead>100000?4:lead>0?1:state.stress<6?5:0;
@@ -75,7 +80,7 @@ function renderTrade(){
  $('availableShares').textContent=side==='buy'?`可買估算 ${fmt(market.affordable(state.cash,p||1))} 股`:`可賣 ${fmt(state.holdings[selected]?.qty||0)} 股`;
  $('buySide').classList.toggle('selected',side==='buy');$('sellSide').classList.toggle('selected',side==='sell');$('buySide').setAttribute('aria-pressed',side==='buy');$('sellSide').setAttribute('aria-pressed',side==='sell');
  $('orderBtn').innerHTML=`送出${side==='buy'?'買進':'賣出'}委託 <span>↗</span>`;$('orderBtn').classList.toggle('sell',side==='sell');
- const blocked=(state.mode==='life'&&!market.canTrade(state))||!inst.tradable||state.status!=='playing'||!!state.activeEvent||busy||!!state.orders.find(o=>o.id===selected)||(state.day>=0&&!market.bar(selected,market.date(state)));
+ const blocked=tutorialLocked()||(state.mode==='life'&&!market.canTrade(state))||!inst.tradable||state.status!=='playing'||!!state.activeEvent||busy||!!state.orders.find(o=>o.id===selected)||(state.day>=0&&!market.bar(selected,market.date(state)));
  $('orderBtn').disabled=blocked||!valid;$('quantity').disabled=!inst.tradable;
  $('tradeNote').textContent=state.mode==='life'&&!state.activeEvent&&!market.canTrade(state)?'等待下一事件開啟三個交易日的操作期。':!inst.tradable?'加權指數供觀察，不能直接下單。選擇 0050 或個股進行交易。':state.activeEvent?'先完成劇情選擇，再進行交易。':state.orders.some(o=>o.id===selected)?'本標的已有委託，可在「待成交」頁籤取消。':quantityMode==='all'?'全部委託：依次日開盤價與當時現金／持股成交；多筆依送單順序。':'次日開盤成交，現金不足則整筆取消。零股與整張採相同開盤價的簡化撮合。';
 }
@@ -101,7 +106,7 @@ function renderPortfolio(){
  }
 }
 async function advance(count,skipWindow=false){
- if(busy||state.status!=='playing')return;if(state.activeEvent){notify('先完成小韭的劇情選擇。');return;}if(skipWindow&&state.mode==='life')state.life.until=state.day-1;playbackPaused=false;busy=true;$('orderMessage').textContent='';render();let moved=0;
+ if(busy||state.status!=='playing')return;if(tutorialLocked()){showTutorial(true);return;}if(state.activeEvent){notify('先完成小韭的劇情選擇。');return;}if(skipWindow&&state.mode==='life')state.life.until=state.day-1;playbackPaused=false;busy=true;$('orderMessage').textContent='';render();let moved=0;
  try{moved=await playback.run({limit:state.mode==='life'?data.calendar.length:count,step:()=>{if(!market.next(state))return false;lastReply='';syncEvent();return true;},paint:()=>{chart.offset=0;render();save();},shouldStop:()=>!!state.activeEvent||state.status!=='playing'||(state.mode==='life'&&market.canTrade(state)),interval:()=>state.mode==='life'?Number($('playbackSpeed').value):0});beep('next');}
  catch(e){notify('無法推進：'+e.message);}finally{busy=false;playbackPaused=playback.stopped&&state.status==='playing'&&!state.activeEvent;save();render();if(playbackPaused)notify('已暫停在 '+market.date(state)+'。可查看行情，再繼續播放。');else if((count>1||state.mode==='life')&&moved)notify('已播放 '+moved+' 個交易日'+(state.activeEvent?'，遇到新的劇情。':'。'));}
 }
@@ -111,7 +116,7 @@ function renderIntro(){
  $('introImageStatus').hidden=true;img.alt=p.alt;img.src=p.cg;img.dataset.scene=p.id;$('introDialog').dataset.scene=p.id;syncMusic();
  img.onerror=()=>{$('introImageStatus').textContent='CG 未能載入，請重新整理網頁。';$('introImageStatus').hidden=false;};
 }
-function closeIntro(){if(!replay){state.opening=false;changed();}$('introDialog').close();syncMusic();if(!replay&&state.mode==='life'&&state.day<0)advance(1);}
+function closeIntro(){if(!replay){state.opening=false;if(!tutorialProfile[state.mode])state.tutorialPending=true;changed();}$('introDialog').close();syncMusic();if(!replay&&TaiguTutorial.needs(state,tutorialProfile))showTutorial(true);else if(!replay&&state.mode==='life'&&state.day<0)advance(1);}
 function utility(title,html){if(busy)playback.stop();previewMode=null;syncMusic();$('utilityTitle').textContent=title;$('utilityContent').innerHTML=html;if(!$('utilityDialog').open)$('utilityDialog').showModal();}
 function download(name,text,type='application/json'){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function exportSave(){download('台股戰士-'+market.date(state)+'.json',JSON.stringify(pack(),null,2));}
@@ -172,7 +177,7 @@ function showRunStats(kind){
  const labels={playing:r.reason==='restarted'?'中途重新開始':'冒險進行中',won:'成功超越 0050',lost:'未能超越 0050',bankrupt:'資產耗盡', 'awaiting-data':'等待資料補齊'};
  utility(isBest?'最佳遊玩數據':'上次遊玩數據',`<span class="story-badge">${r.mode==='life'?'人生模式':'自由／舊版'} · ${esc(labels[r.status])}</span><h3>${esc(r.date)} · 第 ${r.sessions} 個交易日</h3><div class="result-card"><div><span>小韭總資產</span><b>${dollars(r.equity)}</b></div><div><span>0050 平行人生</span><b>${dollars(r.benchmark)}</b></div></div><p class="result-number">${(r.alpha>=0?'+':'')+r.alpha.toFixed(2)} <small>百分點</small></p><div class="record-details"><div><span>總報酬</span><b>${pct(r.returnPct)}</b></div><div><span>最大回撤</span><b>${r.maxDrawdown.toFixed(2)}%</b></div><div><span>交易次數（成交）</span><b>${r.trades} 筆</b></div><div><span>劇情選擇</span><b>${r.choices} 次</b></div><div><span>累積手續費</span><b>${dollars(r.fees)}</b></div><div><span>累積交易稅</span><b>${dollars(r.tax)}</b></div><div><span>劇情支出</span><b>${dollars(r.spent)}</b></div><div><span>剩餘現金</span><b>${dollars(r.cash)}</b></div></div>${highlightsHTML(r)}<p class="muted-note">最佳紀錄依已結算輪次的超額報酬排序，打平時比較總資產。紀錄僅保存在本機。</p>`);
 }
-function enterGame(){screen='game';$('titleScreen').hidden=true;$('gameShell').hidden=false;document.body.classList.remove('at-title');resultShown=false;render(true);if(state.opening)showIntro();}
+function enterGame(){screen='game';$('titleScreen').hidden=true;$('gameShell').hidden=false;document.body.classList.remove('at-title');resultShown=false;render(true);if(state.opening)showIntro();else if(TaiguTutorial.needs(state,tutorialProfile))showTutorial(true);}
 function showTitle(){if(busy)return;save();screen='title';previewMode=null;for(const d of document.querySelectorAll('dialog[open]'))d.close();$('gameShell').hidden=true;$('titleScreen').hidden=false;document.body.classList.add('at-title');renderTitle();syncMusic();window.scrollTo(0,0);}
 function restartGame(mode=requestedMode){if(typeof mode!=='string')mode=requestedMode;if(mode==='free'&&!progression.freeUnlocked){notify('完成人生模式才可進行自由模式。');return;}
  if(hasProgress())rememberRun(state.status==='playing'?'restarted':'completed');
@@ -204,7 +209,7 @@ function showResult(){syncProgression();const d=market.date(state),e=market.equi
  document.querySelectorAll('[data-qty]').forEach(b=>b.onclick=()=>{quantityMode='fixed';$('quantity').value=b.dataset.qty;renderTrade();});
  $('allQty').onclick=()=>{quantityMode='all';renderTrade();};
  $('halfQty').onclick=()=>{quantityMode='fixed';const p=quote(selected).r?.[4]||1;$('quantity').value=side==='buy'?Math.max(1,market.affordable(state.cash/2,p)):Math.max(1,Math.floor((state.holdings[selected]?.qty||0)/2));renderTrade();};
- $('orderBtn').onclick=()=>{try{market.queue(state,selected,side,Number($('quantity').value),quantityMode);beep('trade');tab='orders';$('orderMessage').textContent='委託已送出，下一交易日開盤撮合。';changed();notify('委託已送出。推進時間後查看成交結果。');}catch(e){$('orderMessage').textContent=e.message;}};
+ $('orderBtn').onclick=()=>{if(tutorialLocked())return;try{market.queue(state,selected,side,Number($('quantity').value),quantityMode);beep('trade');tab='orders';$('orderMessage').textContent='委託已送出，下一交易日開盤撮合。';changed();notify('委託已送出。推進時間後查看成交結果。');}catch(e){$('orderMessage').textContent=e.message;}};
  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;renderPortfolio();});
  document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{chart.setRange(Number(b.dataset.range));document.querySelectorAll('[data-range]').forEach(n=>n.classList.toggle('selected',n===b));});
  $('maToggle').onchange=()=>{chart.ma=$('maToggle').checked;chart.draw();};$('adjustToggle').onchange=()=>{chart.adjust=$('adjustToggle').checked;render();};$('chartReset').onclick=()=>{chart.offset=0;chart.hover=null;chart.draw();};
@@ -212,15 +217,15 @@ function showResult(){syncProgression();const d=market.date(state),e=market.equi
  $('groupBtn').onclick=showGroup;$('storyGroupBtn').onclick=showGroup;$('newsBtn').onclick=()=>showNews();$('highlightsBtn').onclick=showCurrentHighlights;$('rankingsBtn').onclick=()=>showLeaderboard();$('menuRankings').onclick=()=>showLeaderboard();
  $('saveBtn').onclick=showSaves;$('helpBtn').onclick=showHelp;$('dataBtn').onclick=showData;$('closeUtility').onclick=()=>$('utilityDialog').close();
  document.querySelector('#gameMenu nav').addEventListener('click',e=>{if(e.target.closest('button'))$('gameMenu').open=false;});
- document.addEventListener('click',e=>{if(!e.target.closest('#gameMenu'))$('gameMenu').open=false;});
- document.addEventListener('keydown',e=>{if(e.key==='Escape')$('gameMenu').open=false;});
+ document.addEventListener('click',e=>{if(!tutorial.active&&!e.target.closest('#gameMenu'))$('gameMenu').open=false;});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!tutorial.active)$('gameMenu').open=false;});
  $('soundBtn').onclick=showMusic;$('bgmSettings').onclick=showMusic;$('menuStart').onclick=()=>startFromMenu('life');$('menuFree').onclick=()=>startFromMenu('free');$('menuContinue').onclick=enterGame;$('menuSaves').onclick=showSaves;$('menuLast').onclick=()=>showRunStats('last');$('menuBest').onclick=()=>showRunStats('best');$('menuHelp').onclick=showHelp;$('homeBtn').onclick=showTitle;
  $('bgmToggle').onclick=()=>{if(!music.unlocked){music.setEnabled(true);music.unlock();}else music.setEnabled(!music.enabled);};
  $('bgmVolume').oninput=()=>music.setVolume(Number($('bgmVolume').value)/100);
  function unlockAudio(e){if(e.target.closest?.('#bgmToggle'))return;if(e.type==='keydown'&&!['Enter',' '].includes(e.key))return;if(!music.unlocked||music.blocked)music.unlock();}
  document.addEventListener('click',unlockAudio,{capture:true});document.addEventListener('keydown',unlockAudio,{capture:true});
  $('utilityDialog').addEventListener('close',()=>{previewMode=null;syncMusic();});
- $('replayBtn').onclick=()=>showIntro(true);$('introNext').onclick=()=>{beep();if(introIndex<story.opening.length-1){introIndex++;renderIntro();}else closeIntro();};$('skipIntro').onclick=closeIntro;$('introPrev').onclick=()=>{if(introIndex>0){introIndex--;renderIntro();}};
+ $('tutorialBtn').onclick=()=>showTutorial(false);$('replayBtn').onclick=()=>showIntro(true);$('introNext').onclick=()=>{beep();if(introIndex<story.opening.length-1){introIndex++;renderIntro();}else closeIntro();};$('skipIntro').onclick=closeIntro;$('introPrev').onclick=()=>{if(introIndex>0){introIndex--;renderIntro();}};
  $('introDialog').addEventListener('cancel',e=>{e.preventDefault();closeIntro();});
  $('importInput').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{if(f.size>8*1024*1024)throw Error('檔案超過 8 MB');const p=JSON.parse(await f.text());if(p.format!=='taigu-warrior-save')throw Error('不是台股戰士存檔');resumeState(validateState(p.state));notify('已匯入存檔。');}catch(err){notify('匯入失敗：'+err.message);}};
  window.addEventListener('pagehide',()=>{playback.stop();save();music.setHidden(true);});window.addEventListener('pageshow',()=>music.setHidden(document.hidden));document.addEventListener('visibilitychange',()=>{if(document.hidden){playback.stop();save();}music.setHidden(document.hidden);});

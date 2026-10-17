@@ -77,3 +77,7 @@ JSON 匯入限制 8 MB，驗證格式、資料範圍與帳戶欄位後才替換�
 ## v0.6 呈現層
 
 js/playback.js 的 Runner 在每個引擎 next 後先 paint，再等待可調間隔。stop 會立即喚醒計時器，不多算一天；每一幀儲存本機進度。序章資料新增 cg、alt、title、cue、stamp、next，各頁切換整張插畫。TaiguRecords.inventory 以當下 holdings 為真實部位，log 重建持倉週期買進日期，沿用 market.latest 的已知價格，分割仍由引擎處理。
+
+## v0.7 教學層
+
+js/tutorial.js 提供分模式步驟、完成記憶、首次教學判斷與 Tour 控制器。人生 9 步、自由 3 步；狀態與模態保護、重新載入流程見 [TUTORIAL.md](TUTORIAL.md)。教學規則不參與資產計算或排行榜評分。

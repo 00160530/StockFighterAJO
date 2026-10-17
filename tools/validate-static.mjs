@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const refs=[...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(m=>m[1].split('?')[0]).filter(p=>!p.startsWith('#')&&!p.startsWith('http'));
-const css=['style.css','menu.css','desktop.css','events.css','experience.css'].map(p=>fs.readFileSync(path.join(root,'css',p),'utf8')).join('\n');
+const css=['style.css','menu.css','desktop.css','events.css','experience.css','tutorial.css'].map(p=>fs.readFileSync(path.join(root,'css',p),'utf8')).join('\n');
 for(const m of css.matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g))refs.push(path.join('css',m[1]));
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'assets/audio/manifest.json'),'utf8'));
 for(const t of Object.values(manifest))refs.push(t.src);

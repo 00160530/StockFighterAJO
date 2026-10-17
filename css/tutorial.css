@@ -1,0 +1,11 @@
+.tutorial-dialog{position:fixed;inset:0;margin:0;padding:0;border:0;border-radius:0;width:100%;height:100dvh;max-width:none;max-height:none;overflow:hidden;background:transparent;box-shadow:none;color:#344e3e}
+.tutorial-dialog::backdrop{background:transparent;backdrop-filter:none}
+.tutorial-shade{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+.tutorial-focus{position:fixed;border:2px solid #a9d5b8;border-radius:10px;pointer-events:none;box-shadow:0 0 0 2px #ffffffb3,0 0 18px #84b89855}
+.tutorial-card{position:fixed;left:12px;top:12px;width:min(356px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:20px;border:1px solid #cadbd0;border-radius:12px;background:#fff;box-shadow:0 12px 42px #152f2440;overscroll-behavior:contain}
+.tutorial-meta{display:flex;align-items:center;justify-content:space-between;color:#6a8673;font-size:11px;margin-bottom:15px}.tutorial-meta>span{display:flex;gap:12px;align-items:center}.tutorial-meta b{font:12px ui-monospace,monospace;color:#345e43}.tutorial-meta button{padding:3px;color:#74847a;font-size:10px;text-decoration:underline}
+.tutorial-card h2{font-size:20px;line-height:1.5;color:#2e583e;margin:0 0 12px;font-weight:800}.tutorial-card p{font-size:13px;line-height:1.95;color:#506759;margin:0 0 17px}
+.tutorial-track{height:3px;background:#edf3ee;border-radius:5px;margin-bottom:16px;overflow:hidden}.tutorial-track i{height:100%;display:block;background:#79a188;border-radius:5px;transition:width .2s}
+.tutorial-actions{display:flex;gap:9px;align-items:center}.tutorial-actions button{font-size:12px;border-radius:6px;padding:11px 12px}.tutorial-actions .tutorial-prev{border:1px solid #d7e3da;color:#65816e;white-space:nowrap}.tutorial-actions .tutorial-next{flex:1;background:#416f52;color:#fff;font-weight:700}.tutorial-card>small{display:block;color:#809285;font-size:10px;margin-top:12px;line-height:1.5}
+@media(max-width:650px){.tutorial-card{padding:17px}.tutorial-card h2{font-size:18px}.tutorial-card p{font-size:12px;line-height:1.85}.tutorial-meta{margin-bottom:12px}.tutorial-actions button{font-size:11px;padding:10px}.tutorial-card>small{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.tutorial-track i{transition:none}}
