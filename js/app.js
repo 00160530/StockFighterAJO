@@ -64,13 +64,13 @@ function render(resetChart=false){
 }
 let lastReply='';
 function renderStory(){
- const ev=story.events.find(e=>e.id===state.activeEvent),reaction=!ev&&state.mode==='life'&&state.day>=0&&(busy||playbackPaused)?theatre.reaction(state,selected):null,panel=document.querySelector('.story-panel');
+ const ev=story.events.find(e=>e.id===state.activeEvent),reaction=!ev&&state.mode==='life'&&state.day>=0&&state.status==='playing'?theatre.reaction(state,selected):null,panel=document.querySelector('.story-panel');
  if(reaction)panel.dataset.reaction=reaction.kind;else delete panel.dataset.reaction;
  $('storyChoices').innerHTML='';
  if(ev){$('storySpeaker').textContent=ev.speaker;$('storyTag').textContent=ev.tag;$('storyTitle').textContent=ev.title;$('storyText').textContent=eventSystem.textFor(ev,state);$('storyHint').innerHTML=ev.newsId?'<button id="currentNewsBtn">新聞事實與來源 ↗</button><span>完成選擇後可操作股票</span>':'<span>完成選擇後，才能繼續推進時間。</span>';if(ev.newsId)$('currentNewsBtn').onclick=()=>showNews(ev.newsId);
   ev.choices.forEach(choice=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=choice.label;btn.disabled=tutorialLocked()||(choice.cost||0)>state.cash;btn.onclick=()=>{if(tutorialLocked())return;try{market.choose(state,ev,choice);lastReply=choice.reply;beep();changed();if(choice.openGroup)showGroup();}catch(e){notify(e.message);}};$('storyChoices').append(btn);});
  }else{$('storySpeaker').textContent='小韭';$('storyTag').textContent='內心獨白・下一步由你決定';$('storyTitle').textContent=state.day<0?'一百萬，不是一串數字。':state.orders.length?'下好委託，也放下手機。':'市場還在，先想清楚。';$('storyText').textContent=lastReply||(state.day<0?'那是五年不敢亂花的薪水。上一輪，我把決定交給群組。這一輪，先學著把決定拿回來。':'看過價格，記下理由。今天不交易，也是一種決定。');$('storyHint').textContent=state.mode==='life'?'操作期結束後自動逐日播放，到下一事件停下。':'群組台詞為原創，新聞依當時已公開資料解鎖。';}
- if(reaction){$('storySpeaker').textContent='小韭';$('storyTag').textContent=reaction.id+' · 行情心情';$('storyTitle').textContent=reaction.title;$('storyText').textContent=reaction.text;$('storyHint').textContent=reaction.tag+'（價格比較，未計股利與費稅）';}
+ if(reaction){$('storySpeaker').textContent='小韭';$('storyTag').textContent='加權指數 · 行情心情';$('storyTitle').textContent=reaction.title;$('storyText').textContent=reaction.text;$('storyHint').textContent=reaction.tag;}
  const lead=market.equity(state,market.date(state))-market.equity(state.benchmark,market.date(state));
  const emotion=reaction?reaction.emotion:ev&&/恐懼|風險|錯失/.test(ev.tag)?2:state.stress>60?3:state.day<0?0:lead>100000?4:lead>0?1:state.stress<6?5:0;
  document.querySelectorAll('#gameShell .character-sprite').forEach(el=>{el.dataset.face=emotion==='serious'?'serious':'';const face=typeof emotion==='number'?emotion:0;el.style.setProperty('--sprite-x',(face%3)*50+'%');el.style.setProperty('--sprite-y',Math.floor(face/3)*100+'%');});

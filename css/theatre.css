@@ -29,3 +29,10 @@
 
 .support-cutin{position:absolute;left:-4%;right:-4%;top:22%;padding:16px 8%;transform:rotate(-6deg);background:linear-gradient(95deg,#e9f6ee,#b3d6bd 70%,#e9f6ee);color:#264833;border-top:3px solid #f8fff9;border-bottom:3px solid #476f53;z-index:4;pointer-events:none;box-shadow:0 12px 35px #0006}.support-cutin span{display:block;font-size:14px;letter-spacing:2px}.support-cutin b{display:block;font-size:clamp(27px,4vw,52px);letter-spacing:4px;font-weight:950;margin-top:5px}.support-dialog:not([data-phase=zoom]) .support-cutin{display:none}.support-dialog[data-beat=hold] .support-headline{color:#defce6}.support-impact{font-size:44px;color:#fff7ef}.support-impact::before{border-radius:18%;border-color:#f8ffdf;transform:rotate(45deg)}
 @media(max-width:650px){.support-cutin{padding:14px 8%;top:24%}.support-cutin span{font-size:10px;letter-spacing:0}.support-cutin b{font-size:26px;letter-spacing:1px}.support-impact{font-size:30px}}
+
+.support-callout{position:absolute;width:240px;z-index:4;pointer-events:none;color:#f4ffdf;text-align:center;font-weight:950;line-height:1.16;letter-spacing:1px;filter:drop-shadow(0 4px 8px #0009);text-shadow:2px 2px #274e37,-2px -2px #274e37,2px -2px #274e37,-2px 2px #274e37;transform:rotate(-7deg);animation:supportCue 1s ease-in-out infinite}.support-callout span{display:block;font-size:31px}.support-callout b{display:block;font-size:37px;margin-top:5px}.support-callout i{position:absolute;font-size:46px;right:-28px;top:42px;font-style:normal;color:#c6f9d5}.support-dialog:not([data-phase=play]) .support-callout{display:none}
+@keyframes supportCue{0%,100%{transform:rotate(-7deg) scale(1)}50%{transform:rotate(-7deg) scale(1.045)}}
+@media(max-width:650px){.support-callout{width:145px;letter-spacing:0}.support-callout span{font-size:21px}.support-callout b{font-size:24px;margin-top:4px}.support-callout i{font-size:31px;right:-18px;top:30px}}
+@media(prefers-reduced-motion:reduce){.support-callout{animation:none}}
+
+.story-panel[data-reaction=fomo] .story-body h3{color:#98634c}

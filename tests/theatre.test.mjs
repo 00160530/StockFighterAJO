@@ -12,24 +12,40 @@ function small(prices=[100,96,90],split=[],id='0050'){
  const market={data,date:s=>dates[s.day],chipCutoff:s=>dates[s.day-1],visibleRows:(s,id)=>data.instruments[id].rows.filter(r=>r[0]<=dates[s.day]),latest:(id,d)=>data.instruments[id].rows.filter(r=>r[0]<=d).at(-1),record:(s,type,text,extra)=>s.log.push({date:dates[s.day],type,text,...extra})};
  const state={day:prices.length-1,mode:'life',status:'playing',opening:false,holdings:{[id]:{qty:100,cost:10000}},log:[{date:dates[0],type:'fill',id,side:'buy',qty:100,price:100}]};return {data,s:state,t:T.create(market)};
 }
-test('theatre compares latest actual buy, resets a closed position, and keeps strict 5% boundaries',()=>{
- const {s,t}=small([100,105,106]);assert.equal(t.reaction(s,'0050').title,'台股，簡單！');s.day=1;assert.equal(t.reaction(s,'0050').kind,'watch');
- s.log.push({date:'2020-01-03',type:'fill',id:'0050',side:'buy',qty:100,price:120});s.holdings['0050']={qty:200,cost:22000};s.day=2;assert.equal(t.reaction(s,'0050').title,'獲利去哪裡了？');assert.equal(t.position(s,'0050').entry,120);
+test('position preserves latest actual buy and resets a closed holding cycle',()=>{
+ const {s,t}=small([100,105,106]);assert.equal(t.position(s,'0050').entry,100);
+ s.log.push({date:'2020-01-03',type:'fill',id:'0050',side:'buy',qty:100,price:120});s.holdings['0050']={qty:200,cost:22000};s.day=2;assert.equal(t.position(s,'0050').entry,120);
  s.log.push({date:'2020-01-03',type:'fill',id:'0050',side:'sell',qty:200,price:105},{date:'2020-01-04',type:'fill',id:'0050',side:'buy',qty:100,price:106});assert.equal(t.position(s,'0050').firstBuy,'2020-01-04');
- const b=small([100,95,94]);b.s.day=1;assert.equal(b.t.reaction(b.s,'0050').kind,'watch');b.s.day=2;assert.equal(b.t.reaction(b.s,'0050').kind,'panic');
 });
 test('split-adjusted entry/rows only use splits and fills known at current date',()=>{
  const {s,t}=small([100,104,26],[{date:'2020-01-04',ratio:4}]);s.day=1;s.log.push({type:'fill',id:'0050',side:'buy',date:'2020-01-04',qty:1,price:999});assert.equal(t.position(s,'0050').entry,100);assert.equal(t.adjustedRows(s,'0050')[0][4],100);
  s.log.pop();s.day=2;s.holdings['0050'].qty=400;assert.equal(t.position(s,'0050').entry,25);assert.equal(t.reaction(s,'0050').kind,'watch');assert.equal(t.adjustedRows(s,'0050')[0][4],25);assert.equal(t.supportCandidate(s,'0050'),null);
 });
-test('cash-only falling watchlist uses serious expression and index selection falls back to 0050',()=>{
- const {s,t}=small();s.holdings={};assert.equal(t.reaction(s,'TAIEX').title,'現在買入一定爆賺');assert.equal(t.reaction(s,'0050').emotion,'serious');s.day=1;assert.equal(t.reaction(s,'0050').kind,'cash');assert.equal(t.supportCandidate(s,'0050'),null);
+test('five consecutive index down sessions give serious cash mood regardless of selected stock',()=>{
+ const {data,s,t}=small([100,110,120,130,140,150]);data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=100-i);s.holdings={};assert.equal(t.reaction(s,'TAIEX').kind,'serious');assert.equal(t.reaction(s,'0050').emotion,'serious');s.day=4;assert.equal(t.reaction(s,'0050').kind,'cash');assert.equal(t.supportCandidate(s,'0050'),null);
 });
 test('support requires market selloff, a held falling stock, life mode and cooldown',()=>{
  const {s,t}=small();assert.equal(t.supportCandidate(s,'0050').date,'2020-01-04');s.mode='free';assert.equal(t.supportCandidate(s,'0050'),null);s.mode='life';
  s.log[0].date='2020-01-04';assert.equal(t.supportCandidate(s,'0050'),null);s.log[0].date='2020-01-02';s.supportGames=[{id:'0050',date:'2020-01-04',taps:0,finished:false}];assert.equal(t.supportCandidate(s,'0050'),null);
  for(const prices of [[100,96,97],[100,96,96]]){const b=small(prices);assert.equal(b.t.supportCandidate(b.s,'0050'),null);}
  const suspended=small();suspended.data.instruments['0050'].rows.splice(1,1);assert.equal(suspended.t.supportCandidate(suspended.s,'0050'),null);
+});
+test('in-game dialogue rotates within the matching mood, preserves user quotes and stays stable on redraw',()=>{
+ const seen=[];
+ for(const [prices,kind] of [[[100,110,111,112,113,114,115,116,117],'smug'],[[100,90,89,88,87,86,85,84,83],'panic'],[[100,96,92,88,84,80,76,72,68],'serious']]){
+  const h=small(prices);h.data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=prices[i]);if(kind==='serious')h.s.holdings={};
+  const titles=[];for(let day=5;day<9;day++){h.s.day=day;const before=JSON.stringify(h.s),a=h.t.reaction(h.s,'0050'),b=h.t.reaction(h.s,'0050');assert.equal(a.kind,kind);assert.equal(a.title,b.title);assert.equal(JSON.stringify(h.s),before);titles.push(a.title);seen.push(a.title+' '+a.text);}
+  assert.equal(new Set(titles.slice(0,3)).size,3);
+ }
+ const all=seen.join('\n');for(const q of T.titleQuotes)assert.ok(all.includes(q.text),q.text);
+ assert.ok(all.includes('獲利去哪裡了？'));assert.ok(all.includes('現在買入一定爆賺'));
+});
+test('index streak needs five daily moves, flats and reversals reset it, and no future close or holding profit controls mood',()=>{
+ const h=small([100,80,70,60,50,40,30,20]);h.data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=100+i);h.s.day=4;assert.equal(h.t.reaction(h.s,'0050').kind,'watch');h.s.day=5;assert.equal(h.t.marketTrend(h.s).streak,5);assert.equal(h.t.reaction(h.s,'0050').kind,'smug','losing stock does not override rising index');
+ h.s.holdings={};assert.equal(h.t.reaction(h.s,'0050').kind,'fomo');h.s.holdings={'0050':{qty:100,cost:1}};h.data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=100-i);assert.equal(h.t.reaction(h.s,'0050').kind,'panic','profitable holding does not override falling index');
+ h.data.instruments.TAIEX.rows[4][4]=97;assert.equal(h.t.marketTrend(h.s).streak,1,'flat breaks the chain');assert.equal(h.t.reaction(h.s,'0050').kind,'watch');
+ h.data.instruments.TAIEX.rows[4][4]=98;assert.equal(h.t.marketTrend(h.s).streak,1,'opposite move breaks the chain');
+ h.data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=100+i);const before=JSON.stringify(h.t.reaction(h.s,'0050'));h.data.instruments.TAIEX.rows[6][4]=1;h.data.instruments.TAIEX.rows[7][4]=1;assert.equal(JSON.stringify(h.t.reaction(h.s,'0050')),before,'future data never alters current mood');
 });
 test('published previous-day institutional sum and today index drop govern trigger without future chip leakage',()=>{
  const b=small([100,101,100.9]),inst=b.data.instruments.TAIEX;assert.ok(b.t.supportCandidate(b.s,'0050'),'small holding loss is enough; no two-day stock threshold');
