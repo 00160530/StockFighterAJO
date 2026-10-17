@@ -16,7 +16,7 @@ const salt=randomBytes(16).toString('hex'),iterations=100000,digest=await derive
 const dir=await fs.mkdtemp(path.join(os.tmpdir(),'stockfighter-admin-'));
 const sql=path.join(dir,'credential.sql');
 try{
- const statement="INSERT INTO sf_admin_credentials(username,salt,password_hash,iterations,created_at) VALUES ('"+username+"','"+salt+"','"+digest+"',"+iterations+","+now+") ON CONFLICT(username) DO UPDATE SET salt=excluded.salt,password_hash=excluded.password_hash,iterations=excluded.iterations;\nDELETE FROM sf_admin_sessions WHERE username='"+username+"';\n";
+ const statement="INSERT INTO sf_admin_credentials(username,salt,password_hash,iterations,updated_at) VALUES ('"+username+"','"+salt+"','"+digest+"',"+iterations+","+now+") ON CONFLICT(username) DO UPDATE SET salt=excluded.salt,password_hash=excluded.password_hash,iterations=excluded.iterations,updated_at=excluded.updated_at;\nDELETE FROM sf_admin_sessions WHERE username='"+username+"';\n";
  await fs.writeFile(sql,statement,{mode:0o600});
  const child=spawn(process.execPath,[path.join(root,'node_modules/wrangler/bin/wrangler.js'),'d1','execute','stockfighterajo-leaderboard-db',process.argv[2],'--file',sql],{cwd:root,stdio:['ignore','ignore','pipe'],windowsHide:true});
  // Suppress CLI output so an error cannot accidentally echo the SQL/hash.
