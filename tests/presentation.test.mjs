@@ -34,5 +34,5 @@ test('inventory follows split and suspension without pretending old prices are c
 });
 test('mode-specific ranking keeps gains and losses isolated as well as the main score',()=>{
  const s=market.fresh('life');s.opening=false;s.runId='life';s.status='won';const a=R.snapshot(market,s,'completed');Object.assign(a,{maxGain:{id:'2330',date:'2020-01-03',qty:1,price:100,costBasis:50,proceeds:100,pnl:50,returnPct:100},maxLoss:{id:'2330',date:'2020-01-03',qty:1,price:20,costBasis:50,proceeds:20,pnl:-30,returnPct:-60}});const b={...a,id:'free',mode:'free',ruleset:'tw-v1',alpha:999},book={runs:[a,b]};
- for(const metric of ['alpha','gain','loss'])for(const [ruleset,id]of [['tw-life-v1','life'],['tw-v1','free']])assert.deepEqual(Array.from(R.leaderboard(book,metric,{ruleset,datasetEnd:market.data.end}),r=>r.id),[id]);
+ for(const [ruleset,id]of [['tw-life-v1','life'],['tw-v1','free']]){assert.deepEqual(Array.from(R.leaderboard(book,'won',{ruleset,datasetEnd:market.data.end}),r=>r.id),[id]);assert.equal(R.leaderboard(book,'lost',{ruleset,datasetEnd:market.data.end}).length,0);}
 });

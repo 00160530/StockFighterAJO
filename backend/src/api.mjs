@@ -17,14 +17,19 @@ function bestInsert(env,runId,metric){const value=metric==='alpha'?'score':metri
  WHERE excluded.value>sf_best_scores.value OR (excluded.value=sf_best_scores.value AND (excluded.drawdown_bps<sf_best_scores.drawdown_bps OR (excluded.drawdown_bps=sf_best_scores.drawdown_bps AND excluded.trades<sf_best_scores.trades)))`,metric,runId);}
 const order='b.value DESC,b.drawdown_bps ASC,b.trades ASC,b.submitted_at ASC,b.run_id ASC';
 function publicRow(row){return {avatarId:row.avatar_id||1,financing:row.financing===1?'margin':'cash',margin:JSON.parse(row.margin_summary||'{}'),rank:row.rank,runId:row.id,nickname:row.nickname,outcome:row.outcome,mode:row.mode,score:row.score,equityCents:row.equity_cents,benchmarkCents:row.benchmark_cents,drawdownBps:row.drawdown_bps,trades:row.trades,gainCents:row.gain_cents,lossCents:row.loss_cents,highlights:JSON.parse(row.highlights),submittedAt:row.submitted_at};}
-async function ranking(env,m,metric,playerId=null,financing='cash'){
- const edition=editionFor(m,financing);if(!METRICS.includes(metric))fail(400,'INVALID_METRIC','排行榜類型不正確。');
- if(playerId){const row=await stmt(env,`SELECT b.*,r.id,r.nickname,r.outcome,r.mode,r.score,r.equity_cents,r.benchmark_cents,r.gain_cents,r.loss_cents,r.highlights,r.financing,r.margin_summary,r.avatar_id FROM sf_best_scores b JOIN sf_runs r ON r.id=b.run_id WHERE b.player_id=? AND b.edition=? AND b.metric=? AND r.hidden=0`,playerId,edition,metric).first();if(!row)return null;
-  const count=await stmt(env,`SELECT COUNT(*) AS n FROM sf_best_scores b JOIN sf_runs r ON r.id=b.run_id WHERE b.edition=? AND b.metric=? AND r.hidden=0 AND (b.value>? OR (b.value=? AND (b.drawdown_bps<? OR (b.drawdown_bps=? AND (b.trades<? OR (b.trades=? AND (b.submitted_at<? OR (b.submitted_at=? AND b.run_id<?))))))))`,edition,metric,row.value,row.value,row.drawdown_bps,row.drawdown_bps,row.trades,row.trades,row.submitted_at,row.submitted_at,row.run_id).first();return publicRow({...row,rank:count.n+1});
- }
- const rows=await all(stmt(env,`SELECT r.*,b.value FROM sf_best_scores b JOIN sf_runs r ON r.id=b.run_id WHERE b.edition=? AND b.metric=? AND r.hidden=0 ORDER BY ${order} LIMIT 100`,edition,metric));return rows.map((r,i)=>publicRow({...r,rank:i+1}));
+// Legacy financing editions remain intact; both are ranked together from source runs.
+function boardOutcome(url){const v=url.searchParams.get('outcome')||(url.searchParams.get('metric')==='loss'?'lost':'won');if(!['won','lost'].includes(v))fail(400,'INVALID_OUTCOME','請選擇贏過大盤或未贏大盤。');if(url.searchParams.has('financing'))finance(url.searchParams.get('financing'));return v;}
+async function ranking(env,m,outcome='won',playerId=null){
+ const edition=editionFor(m);if(!['won','lost'].includes(outcome))fail(400,'INVALID_OUTCOME','排行榜分類不正確。');
+ const tie='equity_cents DESC,'+(outcome==='lost'?'COALESCE(-loss_cents,0)':'COALESCE(gain_cents,0)')+' DESC,trades ASC,submitted_at ASC,id ASC';
+ const rows=await all(stmt(env,`WITH candidates AS (
+  SELECT r.*,ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
+  WHERE edition IN (?,?) AND mode=? AND outcome=? AND hidden=0
+ ), ranked AS (SELECT *,ROW_NUMBER() OVER(ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1)
+ SELECT * FROM ranked ${playerId?'WHERE player_id=?':'ORDER BY rank LIMIT 100'}`,edition,edition+':margin-v1',m,outcome,...(playerId?[playerId]:[])));
+ return playerId?(rows[0]?publicRow(rows[0]):null):rows.map(publicRow);
 }
-function highlight(raw,sign){if(raw===null)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_HIGHLIGHT','交易高光不正確。');exactKeys(raw,['symbol','date','qty','priceCents','pnlCents']);if(!EDITION.symbols.some(s=>s.id===raw.symbol)||typeof raw.date!=='string'||raw.date<EDITION.start||raw.date>EDITION.datasetEnd||!/^\d{4}-\d{2}-\d{2}$/.test(raw.date))fail(400,'INVALID_HIGHLIGHT','高光的標的或日期不正確。');integer(raw.qty,1,100000000*4,'高光股數');integer(raw.priceCents,1,100000000,'高光價格');integer(raw.pnlCents,-EDITION.maxEquityCents,EDITION.maxEquityCents,'高光損益');if(raw.pnlCents*sign<=0)fail(400,'INVALID_HIGHLIGHT','高光損益方向不正確。');return raw;}
+function highlight(raw,sign){if(raw===null)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_HIGHLIGHT','交易高光不正確。');exactKeys(raw,['symbol','date','qty','priceCents','pnlCents','costBasisCents']);if(raw.costBasisCents!==undefined){integer(raw.costBasisCents,1,EDITION.maxEquityCents,'交易成本');const proceeds=raw.costBasisCents+raw.pnlCents;if(!Number.isSafeInteger(proceeds)||proceeds<0||proceeds>raw.priceCents*raw.qty)fail(400,'INVALID_HIGHLIGHT','交易成本與損益不一致。');}if(!EDITION.symbols.some(s=>s.id===raw.symbol)||typeof raw.date!=='string'||raw.date<EDITION.start||raw.date>EDITION.datasetEnd||!/^\d{4}-\d{2}-\d{2}$/.test(raw.date))fail(400,'INVALID_HIGHLIGHT','高光的標的或日期不正確。');integer(raw.qty,1,100000000*4,'高光股數');integer(raw.priceCents,1,100000000,'高光價格');integer(raw.pnlCents,-EDITION.maxEquityCents,EDITION.maxEquityCents,'高光損益');if(raw.pnlCents*sign<=0)fail(400,'INVALID_HIGHLIGHT','高光損益方向不正確。');return raw;}
 function marginSummary(raw){
  if(raw===undefined)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_MARGIN','融資紀錄不正確。');
  exactKeys(raw,['totalBorrowedCents','totalInterestCents','interestPaidCents','totalTopupsCents','liquidations','principalCents','interestCents','collateralCents']);
@@ -53,7 +58,7 @@ async function submit(request,env,body,now,ip){
  const playerId=await player(request,env);await rate(env,'score-ip:'+ip,30,3600,now);await rate(env,'score-player:'+playerId,12,3600,now);
  uuid(body.sessionId);if(typeof body.sessionToken!=='string'||!/^[a-f0-9]{64}$/.test(body.sessionToken))fail(401,'SESSION_INVALID','這輪沒有有效的線上 Session。');
  const tokenHash=await hash(body.sessionToken),session=await stmt(env,'SELECT * FROM sf_sessions WHERE id=? AND player_id=? AND token_hash=?',body.sessionId,playerId,tokenHash).first();if(!session)fail(401,'SESSION_INVALID','這輪沒有有效的線上 Session。');
- if(session.used_at!==null){const prior=await stmt(env,'SELECT financing FROM sf_runs WHERE session_id=?',session.id).first();fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:{rank:await ranking(env,session.mode,'alpha',playerId,prior?.financing?'margin':'cash'),submitted:true}});}
+ if(session.used_at!==null){const prior=await stmt(env,'SELECT outcome FROM sf_runs WHERE session_id=?',session.id).first();fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:{rank:await ranking(env,session.mode,prior?.outcome||'won',playerId),submitted:true}});}
  if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','這輪的線上 Session 已到期，本機紀錄仍會保留。');
  const r=validateScore(body,session,now),id=crypto.randomUUID();
  const results=await env.DB.batch([
@@ -64,7 +69,7 @@ async function submit(request,env,body,now,ip){
    ...METRICS.map(metric=>bestInsert(env,id,metric))
  ]);
  if(!results[1].meta.changes)fail(409,'SESSION_USED','這輪已提交過成績。');
- return {submitted:true,runId:id,rank:await ranking(env,session.mode,'alpha',playerId,r.financing?'margin':'cash'),verification:'basic'};
+ return {submitted:true,runId:id,rank:await ranking(env,session.mode,r.outcome,playerId),verification:'basic'};
 }
 async function feedback(request,env,body,now,ip){
  exactKeys(body,['requestId','kind','title','body','steps','version','context','website']);const playerId=await player(request,env),requestId=uuid(body.requestId);
@@ -125,7 +130,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.13.1'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.13.2'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -134,9 +139,9 @@ export async function handle(request,env,ctx={},assets={}){
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/leaderboard'){
-   await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),metric=url.searchParams.get('metric')||'alpha',f=finance(url.searchParams.get('financing'));return json({mode:m,metric,financing:f,edition:EDITION.id,items:await ranking(env,m,metric,null,f),verification:'basic'},200,cors);
+   await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({mode:m,outcome,edition:EDITION.id,items:await ranking(env,m,outcome),verification:'basic'},200,cors);
   }
-  if(request.method==='GET'&&url.pathname==='/v1/rank'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),m=mode(url.searchParams.get('mode')||'life'),metric=url.searchParams.get('metric')||'alpha';return json({entry:await ranking(env,m,metric,p,finance(url.searchParams.get('financing')))},200,cors);}
+  if(request.method==='GET'&&url.pathname==='/v1/rank'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({entry:await ranking(env,m,outcome,p)},200,cors);}
   if(request.method!=='POST')fail(404,'NOT_FOUND','找不到這個 API。');if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');
   const body=await readJson(request);
   let response;

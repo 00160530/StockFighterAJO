@@ -35,7 +35,8 @@ test('fourth-day gap can cause negative cash bankruptcy and persistent debt achi
 });
 test('cash and margin holdings sell independently; highlights include allocated interest and records separate financing editions',()=>{
  const {m,s,queue}=fixture(dates.map(()=>100));queue('buy');m.next(s);queue('buy',500,'cash');m.next(s);queue('sell',250,'cash');m.next(s);assert.equal(m.available(s,'2330'),250);assert.equal(m.available(s,'2330','margin'),1000);queue('sell',500);m.next(s);
- const sale=s.log.at(-1),stats=c.TaiguRecords.tradeStats(m.data,s.log);assert.equal(stats.statsComplete,true);assert.equal(stats.trades,4);assert.ok(sale.interestPaid>0);assert.equal(stats.maxLoss.pnl,sale.realizedPnl);const snap=c.TaiguRecords.snapshot(m,s);assert.equal(snap.margin.totalBorrowed,60000);assert.equal(snap.financing,'margin');assert.ok(snap.ruleset.endsWith(':margin-v1'));assert.equal(c.TaiguRecords.inventory(m,s).rows[0].marginQty,500);
+ const sale=s.log.at(-1),stats=c.TaiguRecords.tradeStats(m.data,s.log);assert.equal(stats.statsComplete,true);assert.equal(stats.trades,4);assert.ok(sale.interestPaid>0);assert.equal(stats.maxLoss.pnl,sale.realizedPnl);const snap=c.TaiguRecords.snapshot(m,s);assert.equal(snap.margin.totalBorrowed,60000);assert.equal(snap.financing,'margin');assert.ok(snap.ruleset.endsWith(':margin-v1'));// Financing metadata remains available even though public boards are unified.
+assert.equal(c.TaiguRecords.inventory(m,s).rows[0].marginQty,500);
 });
 test('all margin uses actual next-open affordability and cancelled or rejected orders never count as borrowing',()=>{
  const {m,s,queue}=fixture(dates.map(()=>100));queue('buy',1,'margin','all');m.cancel(s,'2330');m.next(s);assert.equal(s.margin.totalBorrowed,0);queue('buy',100000000);m.next(s);assert.equal(s.margin.totalBorrowed,0);queue('buy',1,'margin','all');m.next(s);assert.ok(s.cash>=0);assert.ok(s.cash<100);assert.ok(s.margin.totalBorrowed>1000000);
