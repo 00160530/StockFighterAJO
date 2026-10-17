@@ -62,3 +62,9 @@ GitHub Actions 僅測試和發布前端，Worker 部署由 Wrangler 執行。bui
 `GET /v1/polls?page=0` 為公開歷史，每頁 50 題；提供匿名 bearer 時只附該玩家的 myChoice，不公開玩家身分。`POST /v1/polls/:id/vote` 選 yes/no，匿名身分每題僅一票，改選取代原票；在單一 SQL 內確認調查仍進行且公開，另有玩家與 IP 限頻。
 
 管理員 `GET/POST /admin/api/polls`、`POST /admin/api/polls/:id` 設定題目、active、visible。D1 部分唯一索引限制最多一題 active，切換以 batch 原子處理；active 必須 visible，已有票的題目由 DB trigger 鎖定原文。過往資料可隱藏而不刪票。管理員 `GET/POST /admin/api/community-counts` 接受 total 與 wins（非負整數且 wins≤total）；以當下自動數的差額保存，後續通關繼續累加。全部修改須管理登入、同源驗證並留下稽核紀錄。
+
+## 0.13.1 選項文字與移除調查
+
+0010 為 sf_polls 增加 red_label、green_label、deleted_at。紅色綁定 yes，預設行；綠色綁定 no，預設不行。管理新增／修改接口接受可選 redLabel、greenLabel，1–12 字，舊管理頁省略時保留現有文字。公開接口只回傳文字與票數，前端在文字及 aria 屬性中均轉義。
+
+`POST /admin/api/polls/:id/delete`（空 JSON）需要既有管理登入及同源驗證，以 batch 標記 deleted_at、關閉 active／visible 並寫入 delete-poll 稽核。兩種列表、投票及設定接口均排除已刪除題目，保留原始投票供查核；不提供公開刪除接口。
