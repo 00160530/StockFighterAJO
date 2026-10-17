@@ -15,16 +15,17 @@ function createMarket(data){
  function fill(a,id,side,qty,price){
   if(!Number.isSafeInteger(qty)||qty<1||!Number.isFinite(price)||price<=0)throw Error('交易數量或價格不正確');
   const value=money(qty*price),commission=fee(value),tax=side==='sell'?Math.floor(value*(id==='0050'?.001:.003)):0;
-  const h=a.holdings[id]||{qty:0,cost:0};
+  const h=a.holdings[id]||{qty:0,cost:0};let costBasis,realizedPnl;
   if(side==='buy'){
    const total=money(value+commission);if(total>a.cash)throw Error('開盤價格變動，現金不足，委託未成交');
    a.cash=money(a.cash-total);h.qty+=qty;h.cost=money(h.cost+total);a.holdings[id]=h;
   }else if(side==='sell'){
    if(qty>h.qty)throw Error('持股不足，委託未成交');
-   a.cash=money(a.cash+value-commission-tax);h.cost=money(h.cost*(h.qty-qty)/h.qty);h.qty-=qty;
+   const remainingCost=money(h.cost*(h.qty-qty)/h.qty);costBasis=money(h.cost-remainingCost);realizedPnl=money(value-commission-tax-costBasis);
+   a.cash=money(a.cash+value-commission-tax);h.cost=remainingCost;h.qty-=qty;
    if(!h.qty)delete a.holdings[id];
   }else throw Error('未知交易方向');
-  return {id,side,qty,price,value,fee:commission,tax};
+  return {id,side,qty,price,value,fee:commission,tax,...(side==='sell'?{costBasis,realizedPnl}:{})};
  }
  function corporate(a,d,cb){
   for(const [id,inst] of Object.entries(data.instruments)){
@@ -39,16 +40,17 @@ function createMarket(data){
   if(paid)cb?.('dividend',`股利入帳 ${money(paid).toLocaleString('zh-TW')} 元`);return paid;
  }
  function fresh(){return {version:VERSION,datasetEnd:data.end,day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
- function queue(s,id,side,qty){
+ function queue(s,id,side,qty,sizeMode='fixed'){
   if(s.status!=='playing')throw Error('本次冒險已結束');
   if(s.activeEvent)throw Error('請先完成眼前的劇情選擇');
   if(s.day>=data.calendar.length-1)throw Error('已無下一個交易日');
   if(!data.instruments[id]?.tradable)throw Error('大盤指數僅供觀察，不能直接買賣');
   if(!['buy','sell'].includes(side)||!Number.isSafeInteger(qty)||qty<1||qty>100000000)throw Error('請輸入正整數股數');
+  if(!['fixed','all'].includes(sizeMode))throw Error('委託數量模式不正確');
   if(s.orders.some(o=>o.id===id))throw Error('同一標的已有委託，請先取消');
   if(s.day>=0&&!bar(id,date(s)))throw Error('本標的今日暫停交易');
   if(side==='sell'&&qty>(s.holdings[id]?.qty||0))throw Error('可賣股數不足');
-  const order={id,side,qty,submitted:date(s)};s.orders.push(order);record(s,'order',`${side==='buy'?'買進':'賣出'}委託 ${id} ${qty.toLocaleString()} 股，次日開盤撮合`,order);return order;
+  const order={id,side,qty,submitted:date(s),...(sizeMode==='all'?{sizeMode}:{})};s.orders.push(order);record(s,'order',`${sizeMode==='all'?'全部':''}${side==='buy'?'買進':'賣出'}委託 ${id} ${sizeMode==='all'?'約 ':''}${qty.toLocaleString()} 股，次日開盤撮合`,order);return order;
  }
  function cancel(s,id){const n=s.orders.length;s.orders=s.orders.filter(o=>o.id!==id);if(n!==s.orders.length)record(s,'cancel',`取消 ${id} 委託`);}
  function finish(s){const v=equity(s,date(s)),b=equity(s.benchmark,date(s));if(v<=0)s.status='bankrupt';else if(s.day===data.calendar.length-1)s.status=data.end<data.target?'awaiting-data':v>b?'won':'lost';}
@@ -60,7 +62,9 @@ function createMarket(data){
   if(s.day===0||paid>0||s.benchmark.reinvest){const r=bar('0050',d);if(r){const q=affordable(s.benchmark.cash,r[1]);if(q>0)fill(s.benchmark,'0050','buy',q,r[1]);s.benchmark.reinvest=false;}else s.benchmark.reinvest=true;}
   const pending=s.orders;s.orders=[];
   for(const o of pending){const r=bar(o.id,d);if(!r){record(s,'rejected',`${o.id} 暫停交易，委託取消`,o);continue;}
-   try{const trade=fill(s,o.id,o.side,o.qty,r[1]);record(s,'fill',`${o.side==='buy'?'買進':'賣出'} ${o.id} ${o.qty.toLocaleString()} 股 @ ${r[1].toFixed(2)}`,trade);}
+   try{const qty=o.sizeMode==='all'?(o.side==='buy'?affordable(s.cash,r[1]):s.holdings[o.id]?.qty||0):o.qty;
+    if(qty<1)throw Error(o.side==='buy'?'現金不足以買進一股，委託未成交':'已無可賣持股，委託未成交');
+    const trade=fill(s,o.id,o.side,qty,r[1]);record(s,'fill',`${o.side==='buy'?'買進':'賣出'} ${o.id} ${trade.qty.toLocaleString()} 股 @ ${r[1].toFixed(2)}`,{...trade,...(o.sizeMode==='all'?{sizeMode:'all'}:{})});}
    catch(e){record(s,'rejected',`${o.id}：${e.message}`,o);}
   }
   s.stress=Math.max(0,Math.min(100,s.stress-1));
@@ -80,6 +84,7 @@ function createMarket(data){
   for(const key of ['log','orders','seen','history'])if(!Array.isArray(raw[key]))throw Error('存檔紀錄不正確');
   if(!raw.log.every(l=>l&&typeof l.date==='string'&&typeof l.type==='string'&&typeof l.text==='string')||!raw.seen.every(id=>typeof id==='string'))throw Error('存檔紀錄內容不正確');
   if(raw.orders.length>4||!raw.orders.every(o=>data.instruments[o.id]?.tradable&&['buy','sell'].includes(o.side)&&Number.isSafeInteger(o.qty)&&o.qty>0&&o.qty<=100000000)||new Set(raw.orders.map(o=>o.id)).size!==raw.orders.length)throw Error('存檔委託不正確');
+  if(!raw.orders.every(o=>o.sizeMode===undefined||o.sizeMode==='all'))throw Error('存檔委託模式不正確');
   if(!Number.isFinite(raw.stress)||raw.stress<0||raw.stress>100||!Number.isFinite(raw.spent)||raw.spent<0||typeof raw.opening!=='boolean'||!(raw.activeEvent===null||typeof raw.activeEvent==='string'))throw Error('存檔劇情不正確');
   if(!raw.history.every(h=>h&&typeof h.date==='string'&&Number.isFinite(h.player)&&Number.isFinite(h.benchmark))||raw.history.length!==raw.day+2)throw Error('存檔績效不正確');
   return JSON.parse(JSON.stringify(raw));

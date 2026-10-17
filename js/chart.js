@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const COLORS={ink:'#63778a',grid:'#e5edf3',up:'#d45b70',down:'#268d8c',ma5:'#bc7a24',ma20:'#3385c0',ma60:'#9269bf',foreign:'#308caa',trust:'#8971c4',dealer:'#77899e'};
+const COLORS={ink:'#758079',grid:'#e8eeea',up:'#d45b70',down:'#268d8c',ma5:'#bc7a24',ma20:'#3385c0',ma60:'#9269bf',foreign:'#308caa',trust:'#8971c4',dealer:'#77899e'};
 const compact=n=>Math.abs(n)>=1e8?(n/1e8).toFixed(1)+'億':Math.abs(n)>=1e4?(n/1e4).toFixed(1)+'萬':Math.round(n).toLocaleString('zh-TW');
 class MarketChart{
  constructor(canvas,tooltip,market){this.el=canvas;this.tip=tooltip;this.market=market;this.ctx=canvas.getContext('2d');this.range=120;this.offset=0;this.hover=null;this.ma=true;this.adjust=false;this.drag=null;

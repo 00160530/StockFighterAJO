@@ -22,7 +22,7 @@ Use case: stylized-concept. Asset type: production chibi character sprite expres
 Use case: illustration-story. Asset type: simple 2D background for cute chibi Taiwanese stock market visual novel. Wide landscape composition with no people or characters at all. Cozy modest Taipei rental room in morning, simple desk on left holding open laptop with tiny red green candlestick symbols (no readable text), cheap swivel chair, little potted spring onion plant, coffee cup, small shelf with three books and cardboard box, single bed on far right, bright square window showing simplified Taipei apartment shapes and soft blue sky. Keep lower center and right foreground clear open floor for overlaying chibi character sprites. Flat pastel color blocks, clean gently rounded thin dark sage outlines, extremely simple cel shading, only a few background objects, cute casual anime mobile game background, no complex textures, no photorealism, no detailed cinematic painting. Light ivory walls, pale sage desk and bedding, soft peach morning light, pastel sky blue window, small muted yellow highlights. Cheerful soft and approachable. Not luxurious, ordinary office worker's small rental room. No text, no logos, no watermark. Canvas wide 1536x1024 or wider.
 ```
 
-## room-neutral.png（0.3 使用中的背景）
+## room-neutral.png（0.3 背景，0.4 已停用）
 
 1536 × 1024，白牆、藍灰家具、自然日光的小租屋處。使用內建 imagegen 重新生成原創插畫，非 CLI。用於首頁和轉生序章；未對角色套用全畫面黃色或橘色濾鏡。
 
@@ -30,6 +30,16 @@ Use case: illustration-story. Asset type: simple 2D background for cute chibi Ta
 
 ```text
 Use case: illustration-story. Asset: background illustration for a cute Taiwanese stock trading text adventure, landscape 3:2. A modest tidy Taipei rented studio bedroom belonging to a young office worker, simple desk with closed notebook and small potted green onion on left, window showing pale blue sky and simple distant city blocks in center, low bed with white sheets and muted blue-gray blanket on right. Flat hand-drawn 2D animation background, simple confident outlines, broad clean color shapes, only two-level cel shading, charming economical art direction, uncluttered composition with open central floor area for a chibi character overlay. Neutral daylight and accurate WHITE white balance, white walls, soft light-gray floor, cool pale blue window, blue-gray furniture, small natural green accents. Crisp and fresh, no yellow or orange tint, no cream/beige wall or sepia, no amber glow, no golden-hour light, no bloom, no cinematic haze, no painterly texture, no photorealistic detail. No characters, no text, no watermark.
+```
+
+## room-sage.png（0.4 使用中的背景）
+
+1536 × 1024，以 `room-neutral.png` 為編輯目標，保留房間構圖及簡單線條，改成中性白牆、淺灰地板、極淡灰綠窗簾與床單。由內建 imagegen 編輯，非 CLI；原圖保留，未以程式套濾鏡。
+
+最終提示詞：
+
+```text
+Use case: lighting-weather and precise palette edit. Edit target: supplied rented studio bedroom illustration. Preserve the exact room layout, furniture shapes, clean simple 2D cel-shaded linework, empty floor, and absence of characters/text. Replace the dominant BLUE upholstery, blue curtains, blue-gray chair and blue-tinted room shadows with neutral light GRAY and extremely subtle desaturated SAGE GRAY. The result should be predominantly clean neutral WHITE walls and white sheets, light neutral gray floor, soft gray curtains with just a hint of sage green, light sage-gray blanket, neutral charcoal desk chair. Green should be a small restrained accent, NOT a green color wash, NOT mint saturation. Outside the window retain natural pale sky blue but reduce saturation and brightness so it is a supporting background rather than the main color. Plants remain natural green. Neutral midday daylight and WHITE white balance; neutral shadows. Absolutely no orange, yellow, cream, amber, sepia, golden hour, yellow sunlight glow, no vintage filter. No overall blue filter and no overall green filter. Keep the illustration simple, crisp, cute and understated, harmonious with a mostly white user interface with tiny muted green accents. No new objects, no people, no text, no logos, no watermark. Landscape same composition.
 ```
 
 ## 動畫與聲音
