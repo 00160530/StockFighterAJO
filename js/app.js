@@ -25,7 +25,7 @@ function render(resetChart=false){
  $('sessionCount').textContent=state.day<0?'明日開始交易 · 行情截至 2019/12/31':`第 ${state.day+1} / ${data.calendar.length} 個交易日`;
  $('equity').textContent=dollars(e);$('cash').textContent=dollars(state.cash);$('benchmark').textContent=dollars(b);$('playerReturn').textContent='總報酬 '+pct(pr);$('playerReturn').className=tone(pr);$('benchmarkReturn').textContent='總報酬 '+pct(br);$('benchmarkReturn').className=tone(br);
  const receivable=state.receivables.reduce((n,r)=>n+r.amount,0);$('holdingValue').textContent=`持股 ${dollars(e-state.cash-receivable)}${receivable?' · 應收 '+dollars(receivable):''}`;
- $('alpha').innerHTML=(alpha>=0?'+':'')+alpha.toFixed(2)+' <em>百分點</em>';$('alpha').style.color=alpha<0?'#9d7657':'#3c684b';$('alphaHint').textContent=alpha>0?'目前領先 '+dollars(e-b):alpha<0?'距離平行人生還差 '+dollars(b-e):'起跑線一樣，結局由你決定。';
+ $('alpha').innerHTML=(alpha>=0?'+':'')+alpha.toFixed(2)+' <em>百分點</em>';$('alpha').style.color=alpha<0?'#ac4d68':'#1e6977';$('alphaHint').textContent=alpha>0?'目前領先 '+dollars(e-b):alpha<0?'距離平行人生還差 '+dollars(b-e):'起跑線一樣，結局由你決定。';
  $('watchItems').innerHTML=['TAIEX','0050','2330','2317','2454'].map(id=>{const q=quote(id);return `<button class="watch-item ${id===selected?'selected':''}" data-symbol="${id}" aria-pressed="${id===selected}"><div class="watch-top"><strong>${esc(data.instruments[id].name)}</strong><b class="${tone(q.change)}">${q.r?q.r[4].toFixed(id==='TAIEX'?0:2):'—'}</b></div><div class="watch-bottom"><span>${id==='TAIEX'?'TWSE / 大盤':id}</span><b class="${tone(q.change)}">${pct(q.rate)}</b></div></button>`;}).join('');
  document.querySelectorAll('[data-symbol]').forEach(el=>el.onclick=()=>selectSymbol(el.dataset.symbol));
  const inst=data.instruments[selected],q=quote(selected);$('symbolCode').textContent=selected==='TAIEX'?'TWSE':selected;$('symbolName').textContent=inst.name;$('symbolSector').textContent=inst.sector;
@@ -70,7 +70,7 @@ function renderTrade(){
 function renderPortfolio(){
  $('positionCount').textContent=Object.keys(state.holdings).length;$('orderCount').textContent=state.orders.length;
  document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===tab);b.setAttribute('aria-selected',b.dataset.tab===tab);});
- const el=$('portfolioContent'),d=market.date(state);
+ const el=$('portfolioContent'),d=market.date(state);el.dataset.view=tab;
  if(tab==='holdings'){
   const entries=Object.entries(state.holdings);if(!entries.length){el.innerHTML='<div class="empty-state">你的故事，還沒有第一筆持股。<span>從市場觀察選擇標的，下好委託後推進到下一個交易日。</span></div>';return;}
   el.innerHTML='<div class="table-scroll"><table><thead><tr><th>持有標的</th><th>股數</th><th>含費均價</th><th>市值</th><th>未實現損益</th><th></th></tr></thead><tbody>'+entries.map(([id,h])=>{const p=market.latest(id,d)[4],v=p*h.qty,pnl=v-h.cost;return `<tr><td><strong>${esc(data.instruments[id].name)}</strong><small>${id}</small></td><td>${fmt(h.qty)}</td><td>${(h.cost/h.qty).toFixed(2)}</td><td>${dollars(v)}</td><td class="${tone(pnl)}">${pnl>=0?'+':''}${fmt(pnl)}<br><small>${pct(pnl/h.cost*100)}</small></td><td><button class="table-action" data-sell="${id}">賣出</button></td></tr>`;}).join('')+'</tbody></table></div>';
@@ -84,7 +84,7 @@ function renderPortfolio(){
  }else{
   const h=state.history,lo=Math.min(...h.flatMap(p=>[p.player,p.benchmark]))*.96,hi=Math.max(...h.flatMap(p=>[p.player,p.benchmark]))*1.04,span=hi-lo||1;
   const line=key=>h.map((p,i)=>`${i?'L':'M'}${(i/Math.max(1,h.length-1)*600+1).toFixed(2)} ${(130-(p[key]-lo)/span*120).toFixed(2)}`).join(' ');
-  el.innerHTML=`<div class="performance"><div class="perf-key"><span>小韭</span><span>0050 股利再投入</span></div><svg viewBox="0 0 604 140" role="img" aria-label="總資產績效比較，${h.length} 個紀錄點"><path d="M0 130H604M0 70H604M0 10H604" stroke="#edf1e8" fill="none"/><path d="${line('benchmark')}" stroke="#c5a96f" stroke-width="2" fill="none"/><path d="${line('player')}" stroke="#49795d" stroke-width="2" fill="none"/></svg><p>${esc(h[0].date)} — ${esc(d)} · 每日資產按收盤估值，包含應收股利。</p></div>`;
+  el.innerHTML=`<div class="performance"><div class="perf-key"><span>小韭</span><span>0050 股利再投入</span></div><svg viewBox="0 0 604 140" preserveAspectRatio="none" role="img" aria-label="總資產績效比較，${h.length} 個紀錄點"><path d="M0 130H604M0 70H604M0 10H604" stroke="#edf1e8" fill="none"/><path d="${line('benchmark')}" stroke="#8872b7" stroke-width="2" fill="none"/><path d="${line('player')}" stroke="#2f8d9b" stroke-width="2" fill="none"/></svg><p>${esc(h[0].date)} — ${esc(d)} · 每日資產按收盤估值，包含應收股利。</p></div>`;
  }
 }
 async function advance(count){
@@ -167,6 +167,9 @@ function showResult(){const d=market.date(state),e=market.equity(state,d),b=mark
  document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{chart.setRange(Number(b.dataset.range));document.querySelectorAll('[data-range]').forEach(n=>n.classList.toggle('selected',n===b));});
  $('maToggle').onchange=()=>{chart.ma=$('maToggle').checked;chart.draw();};$('adjustToggle').onchange=()=>{chart.adjust=$('adjustToggle').checked;render();};$('chartReset').onclick=()=>{chart.offset=0;chart.hover=null;chart.draw();};
  $('saveBtn').onclick=showSaves;$('helpBtn').onclick=showHelp;$('dataBtn').onclick=showData;$('closeUtility').onclick=()=>$('utilityDialog').close();
+ document.querySelector('#gameMenu nav').addEventListener('click',e=>{if(e.target.closest('button'))$('gameMenu').open=false;});
+ document.addEventListener('click',e=>{if(!e.target.closest('#gameMenu'))$('gameMenu').open=false;});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')$('gameMenu').open=false;});
  $('soundBtn').onclick=showMusic;$('bgmSettings').onclick=showMusic;$('menuStart').onclick=startFromMenu;$('menuContinue').onclick=enterGame;$('menuSaves').onclick=showSaves;$('menuLast').onclick=()=>showRunStats('last');$('menuBest').onclick=()=>showRunStats('best');$('menuHelp').onclick=showHelp;$('homeBtn').onclick=showTitle;
  $('bgmToggle').onclick=()=>{if(!music.unlocked){music.setEnabled(true);music.unlock();}else music.setEnabled(!music.enabled);};
  $('bgmVolume').oninput=()=>music.setVolume(Number($('bgmVolume').value)/100);

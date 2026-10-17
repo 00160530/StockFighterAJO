@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const COLORS={ink:'#8a9786',grid:'#edf1e8',up:'#da7164',down:'#5f9d88',ma5:'#baaa64',ma20:'#75a8b4',ma60:'#b896b5',foreign:'#7a9e9f',trust:'#c6b77b',dealer:'#ad9abb'};
+const COLORS={ink:'#63778a',grid:'#e5edf3',up:'#d45b70',down:'#268d8c',ma5:'#bc7a24',ma20:'#3385c0',ma60:'#9269bf',foreign:'#308caa',trust:'#8971c4',dealer:'#77899e'};
 const compact=n=>Math.abs(n)>=1e8?(n/1e8).toFixed(1)+'億':Math.abs(n)>=1e4?(n/1e4).toFixed(1)+'萬':Math.round(n).toLocaleString('zh-TW');
 class MarketChart{
  constructor(canvas,tooltip,market){this.el=canvas;this.tip=tooltip;this.market=market;this.ctx=canvas.getContext('2d');this.range=120;this.offset=0;this.hover=null;this.ma=true;this.adjust=false;this.drag=null;
@@ -15,7 +15,7 @@ class MarketChart{
  setRange(n){this.range=n;this.offset=0;this.hover=null;this.draw();}
  draw(){
   if(!this.state)return;const canvas=this.el,ctx=this.ctx,rect=canvas.parentElement.getBoundingClientRect();if(!rect.width||!rect.height)return;const w=Math.max(200,rect.width-15),h=rect.height;
-  const dpr=root.devicePixelRatio||1;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.font='9px Consolas, monospace';ctx.textBaseline='middle';
+  const dpr=root.devicePixelRatio||1;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.font='10px Consolas, monospace';ctx.textBaseline='middle';
   const inst=this.market.data.instruments[this.id],asof=this.market.date(this.state),raw=this.market.visibleRows(this.state,this.id);
   this.all=raw.map(r=>r.slice());if(this.adjust)for(const sp of inst.splits||[])if(sp.date<=asof)for(const r of this.all)if(r[0]<sp.date){for(let j=1;j<=4;j++)r[j]/=sp.ratio;r[5]*=sp.ratio;}
   const all=this.all;if(!all.length)return;const end=Math.max(1,all.length-this.offset),start=Math.max(0,end-this.range),rows=all.slice(start,end),n=rows.length;
@@ -29,7 +29,7 @@ class MarketChart{
   for(let i=0;i<n;i++){const r=rows[i],up=r[4]>=r[1],color=up?COLORS.up:COLORS.down;ctx.strokeStyle=color;ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x(i),y(r[2]));ctx.lineTo(x(i),y(r[3]));ctx.stroke();const width=Math.max(1,Math.min(9,step*.62)),body=Math.max(1,Math.abs(y(r[1])-y(r[4])));ctx.fillRect(x(i)-width/2,Math.min(y(r[1]),y(r[4])),width,body);}
   if(this.ma)for(const period of [5,20,60]){ctx.strokeStyle=COLORS['ma'+period];ctx.lineWidth=1.2;ctx.beginPath();let begun=false;for(let i=0;i<n;i++){const a=averages[period][start+i];if(a===null)continue;if(!begun){ctx.moveTo(x(i),y(a));begun=true;}else ctx.lineTo(x(i),y(a));}ctx.stroke();}ctx.lineWidth=1;
   const last=rows.at(-1);ctx.strokeStyle=last[4]>=last[1]?COLORS.up:COLORS.down;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(left,y(last[4]));ctx.lineTo(w-right,y(last[4]));ctx.stroke();ctx.setLineDash([]);
-  const volumeMax=Math.max(1,...rows.map(r=>r[5]));for(let i=0;i<n;i++){ctx.fillStyle=rows[i][4]>=rows[i][1]?'#e9b5a9':'#b8d4c4';const vh=rows[i][5]/volumeMax*(vBottom-vTop-9);ctx.fillRect(x(i)-Math.max(1,step*.58)/2,vBottom-vh,Math.max(1,step*.58),vh);}
+  const volumeMax=Math.max(1,...rows.map(r=>r[5]));for(let i=0;i<n;i++){ctx.fillStyle=rows[i][4]>=rows[i][1]?'#e2a0ad':'#86c5c3';const vh=rows[i][5]/volumeMax*(vBottom-vTop-9);ctx.fillRect(x(i)-Math.max(1,step*.58)/2,vBottom-vh,Math.max(1,step*.58),vh);}
   ctx.fillStyle=COLORS.ink;ctx.textAlign='left';ctx.fillText('成交量（股）',left,vTop-7);ctx.fillText(compact(volumeMax),w-right+5,vTop+5);ctx.strokeStyle=COLORS.grid;ctx.beginPath();ctx.moveTo(left,vBottom);ctx.lineTo(w-right,vBottom);ctx.stroke();
   const cutoff=this.market.chipCutoff(this.state),keys=['foreign','trust','dealer'];const chipRows=rows.map(r=>r[0]<=cutoff?inst.chips[r[0]]:null),chipMax=Math.max(1,...chipRows.flatMap(c=>c?keys.map(k=>Math.abs(c[k])):[]));const mid=(cTop+cBottom)/2;
   ctx.fillStyle=COLORS.ink;ctx.fillText(`法人買賣超（${inst.chipUnit||'股'}）· 延後一日`,left,cTop-7);ctx.fillText(compact(chipMax),w-right+5,cTop+7);ctx.fillText('0',w-right+5,mid);ctx.strokeStyle='#e3e9de';ctx.beginPath();ctx.moveTo(left,mid);ctx.lineTo(w-right,mid);ctx.stroke();
