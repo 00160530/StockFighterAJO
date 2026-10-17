@@ -109,10 +109,10 @@ async function admin(request,env,url,body,now,assets){
   }
   if(request.method==='GET'&&url.pathname==='/admin/api/runs'){
    const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),q=text(url.searchParams.get('q')||'',0,80,'查詢文字'),id=text(url.searchParams.get('id')||'',0,80,'成績編號'),state=url.searchParams.get('status')||'all',m=url.searchParams.get('mode')||'all',f=url.searchParams.get('financing')||'all',sort=url.searchParams.get('sort')||'latest';
-   const sorts={latest:'submitted_at DESC,id DESC',score:'score DESC,submitted_at DESC,id DESC',equity:'equity_cents DESC,id DESC',duration:'play_time_ms DESC,id DESC',trades:'trades DESC,id DESC'};
+   const sorts={latest:'submitted_at DESC,id DESC',score:'score DESC,submitted_at DESC,id DESC',equity:'equity_cents DESC,id DESC',duration:'play_time_ms DESC,id DESC',trades:'trades DESC,id DESC',gain:'gain_cents DESC,id DESC',loss:'loss_cents ASC NULLS LAST,id DESC'};
    if(!['all','active','revoked'].includes(state)||!['all','life','free'].includes(m)||!['all','cash','margin'].includes(f)||!Object.hasOwn(sorts,sort))fail(400,'INVALID_FILTER','查詢條件不正確。');
    const clauses=[],args=[];if(q){clauses.push("nickname LIKE ? ESCAPE '\\'");args.push('%'+q.replace(/[\\%_]/g,'\\$&')+'%');}if(id){clauses.push('id=?');args.push(id);}if(state!=='all'){clauses.push('hidden=?');args.push(state==='revoked'?1:0);}if(m!=='all'){clauses.push('mode=?');args.push(m);}if(f!=='all'){clauses.push('financing=?');args.push(f==='margin'?1:0);}const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
-   const rows=await all(stmt(env,'SELECT id,nickname,mode,outcome,score,equity_cents,drawdown_bps,trades,hidden,moderation_note,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id FROM sf_runs'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?',...args,page*50));
+   const rows=await all(stmt(env,'SELECT id,nickname,mode,outcome,score,equity_cents,benchmark_cents,gain_cents,loss_cents,highlights,drawdown_bps,trades,hidden,moderation_note,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id FROM sf_runs'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?',...args,page*50));
    const count=await stmt(env,'SELECT COUNT(*) AS n FROM sf_runs'+where,...args).first();return json({items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n});
   }
   if(request.method==='POST'&&/^\/admin\/api\/runs\/[a-zA-Z0-9_-]+\/(hide|restore)$/.test(url.pathname)){

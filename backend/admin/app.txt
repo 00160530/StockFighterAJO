@@ -10,7 +10,44 @@ function message(t,error=false){$('message').textContent=t;$('message').classNam
 async function overview(){const d=await api('overview');$('identity').textContent='登入：'+d.actor+' · 所有時間為台北時間';$('overview').replaceChildren(...[['未讀回報',d.unread],['全部回報',d.feedback],['有效成績',d.runs],['匿名玩家',d.players]].map(([label,n])=>{const a=el('article');a.append(el('small',label),el('b',String(n)));return a;}));}
 function report(r){const box=el('details',undefined,'report'),summary=el('summary'),meta=el('div',undefined,'meta');meta.append(el('span',r.kind==='wish'?'✧ 許願':'⚑ 問題回報','badge'),el('span',labels[r.status],'badge'),el('time',time(r.created_at)));summary.append(meta,el('h2',r.title));box.append(summary,el('p',r.body,'body'));if(r.steps)box.append(el('div','重現步驟\n'+r.steps,'steps'));box.append(el('p','版本 '+r.version+(r.game_date?' · '+r.game_date+' · '+(r.mode==='life'?'人生模式':'自由模式'):'')+' · 編號 '+r.id));
  const form=el('form',undefined,'edit'),label=el('label','處理狀態'),select=el('select');for(const [value,text]of Object.entries(labels)){const o=el('option',text);o.value=value;o.selected=value===r.status;select.append(o);}label.append(select);const notes=el('label','管理筆記（只有後台可見）'),area=el('textarea');area.maxLength=2000;area.value=r.admin_note;notes.append(area);const save=el('button','儲存處理紀錄');save.type='submit';form.append(label,notes,save);form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await api('feedback/'+r.id,{status:select.value,note:area.value});message('已儲存處理紀錄。');const fresh=await api('feedback?status=all&page=0');feedbackCounts(fresh.counts);await overview();r.status=select.value;meta.children[1].textContent=labels[r.status];}catch(err){message(err.message,true);}finally{save.disabled=false;}};box.append(form);return box;}
-function runTable(rows){const wrap=el('div',undefined,'run-table-wrap'),table=el('table',undefined,'run-table'),head=el('thead'),hr=el('tr');for(const name of ['玩家／成績','模式','分數／資產','風險／交易','遊玩時長','技能／融資紀錄','提交時間','狀態／處理'])hr.append(el('th',name));head.append(hr);table.append(head);const body=el('tbody');for(const r of rows){const tr=el('tr');tr.dataset.revoked=!!r.hidden;const cell=(...nodes)=>{const td=el('td');td.append(...nodes);tr.append(td);return td;};cell(el('strong',r.nickname),el('small',r.id,'run-id'));cell(el('span',r.mode==='life'?'人生模式':'自由模式'),el('small',r.financing?'融資':'現股'));cell(el('strong',(r.score>=0?'+':'')+(r.score/100).toFixed(2)+' 百分點'),el('small',money(r.equity_cents)),el('small',r.outcome==='won'?'成功超越 0050':'未能超越 0050'));cell(el('span','回撤 '+(r.drawdown_bps/100).toFixed(2)+'%'),el('small','成交 '+r.trades+' 筆'));cell(el('span',duration(r.play_time_ms)),...(r.play_time_partial?[el('small','從新版開始累計')]:[]));const uses=r.skill_uses?JSON.parse(r.skill_uses):null,details=el('details'),summary=el('summary','查看統計');details.append(summary,el('p',uses?'媽媽10塊 '+uses.mother+' 次 · VIP '+uses.vip+' 次 · 奇門遁甲 '+uses.divination+' 次':'尚無技能紀錄'));if(r.financing){const m=JSON.parse(r.margin_summary||'{}');details.append(el('p','累計融資 '+money(m.totalBorrowedCents||0)+' · 利息 '+money(m.totalInterestCents||0)+' · 斷頭 '+(m.liquidations||0)+' 次'));}cell(details);cell(el('time',time(r.submitted_at)));const action=cell(el('b',r.hidden?'已註銷':'有效','badge'),el('small',r.moderation_note||'')),button=el('button',r.hidden?'恢復':'註銷',r.hidden?'restore':'revoke');button.type='button';button.onclick=()=>{button.hidden=true;const form=el('form',undefined,'moderation-form'),label=el('label',r.hidden?'恢復原因':'註銷原因'),input=el('textarea');input.required=true;input.minLength=2;input.maxLength=500;input.rows=2;label.append(input);const submit=el('button',r.hidden?'確認恢復':'確認註銷'),cancel=el('button','取消');submit.type='submit';cancel.type='button';cancel.onclick=()=>{form.remove();button.hidden=false;};form.append(label,submit,cancel);form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await api('runs/'+r.id+(r.hidden?'/restore':'/hide'),{note:input.value});await load();message(r.hidden?'已恢復成績並重新計算最佳成績。':'已註銷成績並重新計算最佳成績。');}catch(err){message(err.message,true);submit.disabled=false;}};action.append(form);input.focus();};action.append(button);body.append(tr);}table.append(body);wrap.append(table);return wrap;}
+function runHighlight(r,key){
+ const trades=JSON.parse(r.highlights||'{}'),t=trades[key],amount=t?.pnlCents??r[key==='maxGain'?'gain_cents':'loss_cents'];
+ if(amount===null||amount===undefined)return [el('span','—')];
+ const pct=t?.costBasisCents>0?amount/t.costBasisCents*100:null,nodes=[el('strong',(amount<0?'−':'')+money(Math.abs(amount)),'trade-'+(amount<0?'negative':'positive')),el('small',pct===null?'報酬率未記錄':(pct>=0?'+':'')+pct.toFixed(2)+'%')];
+ if(t)nodes.push(el('small',t.symbol+' · '+t.date));return nodes;
+}
+function runTable(rows){
+ const wrap=el('div',undefined,'run-table-wrap'),table=el('table',undefined,'run-table'),head=el('thead'),hr=el('tr');
+ for(const name of ['玩家／成績','模式／結局','最後總資產','與大盤比較','單筆最大獲利','單筆最大虧損','交易次數','遊玩時長','技能／融資紀錄','提交時間','狀態／處理']){const th=el('th',name);th.scope='col';hr.append(th);}head.append(hr);table.append(head);
+ const body=el('tbody');
+ for(const r of rows){
+  const tr=el('tr');tr.dataset.revoked=!!r.hidden;
+  const cell=(...nodes)=>{const td=el('td');td.append(...nodes);tr.append(td);return td;};
+  cell(el('strong',r.nickname),el('small',r.id,'run-id'));
+  cell(el('span',r.mode==='life'?'人生模式':'自由模式'),el('small',r.outcome==='won'?'贏過大盤':'未贏大盤'),el('small',r.financing?'曾使用融資':'現股'));
+  cell(el('strong',money(r.equity_cents),'run-equity'));
+  const delta=r.benchmark_cents>0?(r.equity_cents/r.benchmark_cents-1)*100:null;
+  cell(el('strong',delta===null?'—':(delta>0?'贏過 ':delta<0?'落後 ':'持平 ')+Math.abs(delta).toFixed(2)+'%'),el('small','大盤 '+money(r.benchmark_cents)));
+  cell(...runHighlight(r,'maxGain'));cell(...runHighlight(r,'maxLoss'));
+  cell(el('strong',r.trades.toLocaleString('zh-TW')+' 次'));
+  cell(el('span',duration(r.play_time_ms)),...(r.play_time_partial?[el('small','從新版開始累計')]:[]));
+  const uses=r.skill_uses?JSON.parse(r.skill_uses):null,details=el('details'),summary=el('summary','更多統計'),m=JSON.parse(r.margin_summary||'{}');
+  const statCell=cell(el('span',uses?'媽媽 '+uses.mother+' · VIP '+uses.vip+' · 奇門 '+uses.divination:'技能次數未記錄','skill-counts'),el('small','累計融資 '+money(m.totalBorrowedCents||0)));
+  details.append(summary,el('p','技能次數：'+(uses?'媽媽10塊 '+uses.mother+' 次 · 林北VIP拉 '+uses.vip+' 次 · 奇門遁甲 '+uses.divination+' 次':'尚無紀錄')),el('p','資產從高點最大跌幅 '+(r.drawdown_bps/100).toFixed(2)+'%'),el('small','本輪總資產從曾經最高值到之後低點的最大跌幅。例如從 100 萬元跌到 80 萬元，就是 20%。'));
+  if(r.financing)details.append(el('p','累計融資 '+money(m.totalBorrowedCents||0)+' · 利息 '+money(m.totalInterestCents||0)+' · 斷頭 '+(m.liquidations||0)+' 次'),el('p','累計補款 '+money(m.totalTopupsCents||0)+' · 已付利息 '+money(m.interestPaidCents||0)),el('p','剩餘本金 '+money(m.principalCents||0)+' · 未付利息 '+money(m.interestCents||0)+' · 保證金 '+money(m.collateralCents||0)));
+  details.append(el('p','原始報酬率差 '+(r.score>=0?'+':'')+(r.score/100).toFixed(2)+' 百分點'));statCell.append(details);
+  cell(el('time',time(r.submitted_at)));
+  const line=el('div',undefined,'run-status-line'),badge=el('b',r.hidden?'已註銷':'有效','badge'),button=el('button',r.hidden?'恢復':'註銷',r.hidden?'restore':'revoke');button.type='button';line.append(badge,button);
+  const action=cell(line);if(r.moderation_note){const note=el('small',r.moderation_note,'run-note');note.title=r.moderation_note;action.append(note);}
+  button.onclick=()=>{
+   button.hidden=true;const form=el('form',undefined,'moderation-form'),label=el('label',r.hidden?'恢復原因':'註銷原因'),input=el('textarea');input.required=true;input.minLength=2;input.maxLength=500;input.rows=2;label.append(input);
+   const submit=el('button',r.hidden?'確認恢復':'確認註銷'),cancel=el('button','取消');submit.type='submit';cancel.type='button';cancel.onclick=()=>{form.remove();button.hidden=false;};form.append(label,submit,cancel);
+   form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await api('runs/'+r.id+(r.hidden?'/restore':'/hide'),{note:input.value});await load();message(r.hidden?'已恢復成績並重新計算最佳成績。':'已註銷成績並重新計算最佳成績。');}catch(err){message(err.message,true);submit.disabled=false;}};
+   action.append(form);input.focus();
+  };body.append(tr);
+ }
+ table.append(body);wrap.append(table);return wrap;
+}
 function feedbackCounts(counts){for(const option of $('statusFilter').options)option.textContent=(option.value==='all'?'全部':labels[option.value])+'（'+(counts[option.value]||0)+'）';}
 function runParams(){return new URLSearchParams({page,q:$('runQuery').value.trim(),id:$('runId').value.trim(),status:$('runStatus').value,mode:$('runMode').value,financing:$('runFinancing').value,sort:$('runSort').value});}
 
