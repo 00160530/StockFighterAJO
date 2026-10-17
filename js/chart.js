@@ -5,7 +5,8 @@ const compact=n=>Math.abs(n)>=1e8?(n/1e8).toFixed(1)+'億':Math.abs(n)>=1e4?(n/1
 // Presentation-only copy. The historical row and game state never change.
 function fallingBar(row,progress){const t=Math.max(0,Math.min(1,progress)),p=Math.pow(t,1.65),r=row.slice();for(const k of [2,3,4])r[k]=row[1]+(row[k]-row[1])*p;r[5]=row[5]*p;return r;}
 class MarketChart{
- constructor(canvas,tooltip,market){this.el=canvas;this.tip=tooltip;this.market=market;this.ctx=canvas.getContext('2d');this.range=120;this.offset=0;this.hover=null;this.ma=true;this.adjust=false;this.drag=null;
+ constructor(canvas,tooltip,market){this.el=canvas;this.tip=tooltip;this.market=market;this.ctx=canvas.getContext('2d');this.range=120;this.offset=0;this.hover=null;this.ma=true;this.adjust=true;this.drag=null;
+  this.events=[];this.showEvents=true;this.markerLayer=document.createElement('div');this.markerLayer.className='chart-event-layer';canvas.parentElement.append(this.markerLayer);
   this.resize=new ResizeObserver(()=>this.draw());this.resize.observe(canvas.parentElement);
   canvas.addEventListener('wheel',e=>{e.preventDefault();this.range=Math.max(20,Math.min(300,Math.round(this.range*(e.deltaY>0?1.15:.85))));this.hover=null;this.draw();},{passive:false});
   canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;this.drag={x:e.clientX,offset:this.offset};canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing';});
@@ -14,6 +15,11 @@ class MarketChart{
   canvas.addEventListener('pointerleave',()=>{if(!this.drag){this.hover=null;this.tip.hidden=true;this.draw();}});
  }
  update(state,id,reset=false){this.state=state;this.id=id;if(reset)this.offset=0;this.hover=null;this.tip.hidden=true;this.draw();}
+ renderMarkers(rows,x,y,w,bottom){
+  this.markerLayer.replaceChildren();this.markerLayer.hidden=!this.showEvents||!!this.fall;if(this.markerLayer.hidden||!root.TaiguChartEvents)return;
+  const groups=root.TaiguChartEvents.collect(this.state,this.events,this.market.date(this.state)),marks=root.TaiguChartEvents.layout(groups,rows,x,y,w,bottom);
+  for(const mark of marks){const b=document.createElement('button');b.type='button';b.className='chart-event-marker'+(mark.full?'':' compact');b.textContent=mark.full?mark.label:mark.entries.length>1?mark.entries.length:'•';b.style.left=mark.left+'px';b.style.top=mark.top+'px';b.style.setProperty('--stem',mark.stem+'px');b.title=mark.date+' · '+mark.entries.map(e=>e.title).join('／');b.setAttribute('aria-label',b.title);b.onclick=()=>this.onAnnotation?.(mark);this.markerLayer.append(b);}
+ }
  setRange(n){this.range=n;this.offset=0;this.hover=null;this.draw();}
  beginFall(context){this.fall={id:context.id,date:context.date,progress:0};this.fallSpot=null;this.hover=null;this.tip.hidden=true;}
  setFall(progress){if(!this.fall)return;this.fall.progress=Math.max(0,Math.min(1,progress));this.hover=null;this.draw();}
@@ -49,6 +55,7 @@ class MarketChart{
   }
   const r=rows[selected];document.getElementById('ohlcLine').textContent=`${r[0]}　開 ${r[1].toFixed(2)}　高 ${r[2].toFixed(2)}　低 ${r[3].toFixed(2)}　收 ${r[4].toFixed(2)}`;
   for(const period of [5,20,60])document.getElementById('ma'+period).textContent=averages[period][start+selected]?.toFixed(2)||'—';
+  this.renderMarkers(realRows,x,y,w,pBottom);
  }
 }
 root.TaiguChart=MarketChart;

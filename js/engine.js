@@ -8,6 +8,9 @@ function createMarket(data){
  const date=s=>s.day<0?'2019-12-31':data.calendar[s.day];
  const bar=(id,d)=>maps[id]?.get(d)||null;
  function latest(id,d){const rows=data.instruments[id]?.rows||[];for(let i=rows.length-1;i>=0;i--)if(rows[i][0]<=d)return rows[i];return null;}
+ const stamps=new Map();
+ function datasetStamp(end){if(stamps.has(end))return stamps.get(end);const parts=[data.calendar.filter(d=>d<=end)];for(const id of Object.keys(data.instruments).sort()){const i=data.instruments[id];parts.push([id,i.rows.filter(r=>r[0]<=end),(i.splits||[]).filter(x=>x.date<=end),(i.dividends||[]).filter(x=>x.ex<=end),Object.keys(i.chips||{}).filter(d=>d<=end).sort().map(d=>[d,i.chips[d]])]);}const text=JSON.stringify(parts);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}const stamp=(a>>>0).toString(16).padStart(8,'0')+(b>>>0).toString(16).padStart(8,'0');stamps.set(end,stamp);return stamp;}
+ function stamp(s){s.datasetPrefix=datasetStamp(s.datasetEnd);return s;}
  const account=()=>({cash:INITIAL,holdings:{},receivables:[]});
  function record(s,type,text,extra={}){s.log.push({date:date(s),type,text,...extra});}
  function equity(a,d){let v=a.cash+a.receivables.reduce((n,r)=>n+r.amount,0);for(const [id,h]of Object.entries(a.holdings))v+=h.qty*(latest(id,d)?.[4]||0);return money(v);}
@@ -39,7 +42,7 @@ function createMarket(data){
   let paid=0;a.receivables=a.receivables.filter(r=>{if(r.pay<=d){a.cash=money(a.cash+r.amount);paid+=r.amount;return false;}return true;});
   if(paid)cb?.('dividend',`股利入帳 ${money(paid).toLocaleString('zh-TW')} 元`);return paid;
  }
- function fresh(mode='free'){if(!['life','free'].includes(mode))throw Error('未知遊戲模式');return {version:VERSION,mode,...(mode==='life'?{life:{until:-1,openedAt:-1,anchorId:null,windows:0}}:{}),datasetEnd:data.end,day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
+ function fresh(mode='free'){if(!['life','free'].includes(mode))throw Error('未知遊戲模式');return {version:VERSION,mode,...(mode==='life'?{life:{until:-1,openedAt:-1,anchorId:null,windows:0}}:{}),datasetEnd:data.end,datasetPrefix:datasetStamp(data.end),day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
  const canTrade=s=>s.status==='playing'&&!s.opening&&!s.activeEvent&&!s.supportGames?.some(g=>g.choice==='pending')&&(s.mode!=='life'||(s.day>=0&&s.day<=s.life.until));
  function openWindow(s,id){if(s.mode!=='life')return;const until=Math.min(s.day+2,data.calendar.length-1);if(s.life.anchorId!==id)s.life.windows++;s.life={...s.life,openedAt:s.day,until:Math.max(s.life.until,until),anchorId:id};}
  function migrateLegacy(s){if(s.mode!==undefined)return s;s.mode='life';s.life={until:Math.min(s.day+2,data.calendar.length-1),openedAt:s.day,anchorId:'legacy-resume',windows:1,eligibleForUnlock:s.status==='playing'};return s;}
@@ -80,7 +83,11 @@ function createMarket(data){
  function validate(raw){
   if(raw?.supportGames!==undefined&&(!Array.isArray(raw.supportGames)||raw.supportGames.length>100||!raw.supportGames.every((g,i,a)=>g&&data.instruments[g.id]?.tradable&&data.calendar.includes(g.date)&&g.date<=date(raw)&&Number.isSafeInteger(g.taps)&&g.taps>=0&&g.taps<=10000&&typeof g.finished==='boolean'&&(!i||g.date>a[i-1].date)&&(g.choice===undefined||['pending','use','decline'].includes(g.choice))&&(g.choice!=='pending'||(!g.finished&&g.taps===0&&g.date===date(raw)&&i===a.length-1&&raw.mode==='life'&&raw.status==='playing'&&raw.holdings?.[g.id]))&&(g.choice!=='decline'||(g.finished&&g.taps===0)))))throw Error('存檔支撐線紀錄不正確');
   if(raw?.tutorialPending!==undefined&&typeof raw.tutorialPending!=='boolean')throw Error('存檔教學狀態不正確');
-  if(!raw||raw.version!==VERSION||raw.datasetEnd!==data.end)throw Error('存檔版本或資料範圍不相容');
+  if(!raw||raw.version!==VERSION)throw Error('存檔版本或資料範圍不相容');
+  const extended=typeof raw.datasetEnd==='string'&&raw.datasetEnd<data.end&&data.calendar.includes(raw.datasetEnd),same=raw.datasetEnd===data.end;
+  if(!same&&!extended)throw Error('存檔版本或資料範圍不相容');
+  if(extended&&(!raw.datasetPrefix||raw.datasetPrefix!==datasetStamp(raw.datasetEnd)))throw Error('舊存檔與已追加的歷史資料不相容');
+  if(same&&raw.datasetPrefix!==undefined&&raw.datasetPrefix!==datasetStamp(raw.datasetEnd))throw Error('存檔歷史資料已變更');
   if(raw.mode!==undefined&&!['life','free'].includes(raw.mode))throw Error('存檔模式不正確');
   if(raw.mode==='life'){const l=raw.life;if(!l||!Number.isInteger(l.until)||!Number.isInteger(l.openedAt)||l.openedAt< -1||l.openedAt>raw.day||l.until< -1||l.until>=data.calendar.length||l.until>raw.day+2||!Number.isSafeInteger(l.windows)||l.windows<0||!(l.anchorId===null||typeof l.anchorId==='string'))throw Error('存檔操作期不正確');}
   if(raw.chats!==undefined&&(!Array.isArray(raw.chats)||raw.chats.length>250||!raw.chats.every(c=>c&&typeof c.id==='string'&&typeof c.eventId==='string'&&typeof c.date==='string'&&c.date<=date(raw)&&typeof c.title==='string'&&Array.isArray(c.messages)&&c.messages.length<=12&&c.messages.every(m=>m&&typeof m.speaker==='string'&&typeof m.text==='string'&&m.text.length<=500)&&Array.isArray(c.replies)&&c.replies.length<=4&&c.replies.every(r=>typeof r==='string')&&(c.reply===null||c.replies.includes(c.reply)))))throw Error('存檔群組紀錄不正確');
@@ -96,11 +103,13 @@ function createMarket(data){
   if(!raw.orders.every(o=>o.sizeMode===undefined||o.sizeMode==='all'))throw Error('存檔委託模式不正確');
   if(!Number.isFinite(raw.stress)||raw.stress<0||raw.stress>100||!Number.isFinite(raw.spent)||raw.spent<0||typeof raw.opening!=='boolean'||!(raw.activeEvent===null||typeof raw.activeEvent==='string'))throw Error('存檔劇情不正確');
   if(!raw.history.every(h=>h&&typeof h.date==='string'&&Number.isFinite(h.player)&&Number.isFinite(h.benchmark))||raw.history.length!==raw.day+2)throw Error('存檔績效不正確');
-  return JSON.parse(JSON.stringify(raw));
+  const result=JSON.parse(JSON.stringify(raw));
+  if(extended){if(raw.history.some((h,i)=>h.date!==(i===0?'2019-12-31':data.calendar[i-1])))throw Error('存檔交易日順序不相容');result.datasetEnd=data.end;result.datasetPrefix=datasetStamp(data.end);if(['won','lost','awaiting-data'].includes(raw.status)&&raw.day===data.calendar.indexOf(raw.datasetEnd)){result.extendedFrom={date:raw.datasetEnd,status:raw.status};if(raw.runId){result.parentRunId=raw.runId;delete result.runId;}result.status='playing';if(result.mode==='life')openWindow(result,'extended-'+raw.datasetEnd);}}
+  return result;
  }
  function visibleRows(s,id){return data.instruments[id].rows.filter(r=>r[0]<=date(s));}
  function chipCutoff(s){return s.day<=0?'2019-12-31':data.calendar[s.day-1];}
- return {data,date,bar,latest,equity,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend,canTrade,openWindow,migrateLegacy};
+ return {data,date,bar,latest,datasetStamp,stamp,equity,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend,canTrade,openWindow,migrateLegacy};
 }
 root.TaiguEngine={createMarket,fee,money,INITIAL,VERSION};
 })(globalThis);

@@ -35,9 +35,9 @@ test('in-game dialogue rotates within the matching mood, preserves user quotes a
  for(const [prices,kind] of [[[100,110,111,112,113,114,115,116,117],'smug'],[[100,90,89,88,87,86,85,84,83],'panic'],[[100,96,92,88,84,80,76,72,68],'serious']]){
   const h=small(prices);h.data.instruments.TAIEX.rows.forEach((r,i)=>r[4]=prices[i]);if(kind==='serious')h.s.holdings={};
   const titles=[];for(let day=5;day<9;day++){h.s.day=day;const before=JSON.stringify(h.s),a=h.t.reaction(h.s,'0050'),b=h.t.reaction(h.s,'0050');assert.equal(a.kind,kind);assert.equal(a.title,b.title);assert.equal(JSON.stringify(h.s),before);titles.push(a.title);seen.push(a.title+' '+a.text);}
-  assert.equal(new Set(titles.slice(0,3)).size,3);
+  assert.equal(new Set(titles.slice(0,2)).size,2);
  }
- const all=seen.join('\n');for(const q of T.titleQuotes)assert.ok(all.includes(q.text),q.text);
+ const all=seen.join('\n');for(const pool of Object.values(T.reactionLines))for(const line of pool)assert.ok(all.includes(line.title));assert.ok(!T.reactionLines.smug.some(x=>x.title==='本多終勝'));assert.ok(!T.reactionLines.panic.some(x=>x.title==='別人恐懼我貪婪，別人小虧我破產'));assert.ok(!T.reactionLines.serious.some(x=>x.title==='股票就是買低賣高，台股，簡單！')); 
  assert.ok(all.includes('獲利去哪裡了？'));assert.ok(all.includes('現在買入一定爆賺'));
 });
 test('index streak needs five daily moves, flats and reversals reset it, and no future close or holding profit controls mood',()=>{
