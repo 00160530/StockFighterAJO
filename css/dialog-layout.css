@@ -1,0 +1,21 @@
+/* Shared dialog spacing; headers stay visible while only the body scrolls. */
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]){--dialog-space:22px;max-height:94dvh;overflow:hidden}
+.utility-dialog:is([data-view=help],[data-view=feedback]){height:min(720px,94dvh)}
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills])[open]{display:flex;flex-direction:column}
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) .dialog-heading{position:static;flex:0 0 auto;padding:16px var(--dialog-space);gap:16px}
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) .dialog-heading h2{margin:0;font-size:18px;line-height:1.4}
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) .dialog-heading button{display:grid;place-items:center;width:32px;height:32px;flex:0 0 auto;padding:0;line-height:1}
+.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) #utilityContent{flex:1 1 auto;min-height:0;padding:20px var(--dialog-space);overflow-y:auto;scrollbar-gutter:stable;overscroll-behavior:contain;font-size:13px;line-height:1.7}
+.utility-dialog[data-view=help] .help-article>:first-child{margin-top:0}
+.utility-dialog[data-view=skills]{width:min(680px,94vw)}
+.utility-dialog[data-view=skills] .skill-intro{display:grid;gap:10px;margin-bottom:16px}
+.utility-dialog[data-view=skills] .skill-intro p{margin:0!important;line-height:1.7}
+.utility-dialog[data-view=skills] .skill-points{display:flex;align-items:center;gap:10px;justify-self:start;background:#edf5ef;border:1px solid #d1e3d7;border-radius:8px;padding:7px 12px}
+.utility-dialog[data-view=skills] .skill-points strong{display:inline;font-size:24px;line-height:1.2}
+.utility-dialog[data-view=skills] .skill-cards{gap:12px}
+.utility-dialog[data-view=skills] .skill-cards article{display:grid;gap:10px;padding:14px 16px;min-width:0}
+.utility-dialog[data-view=skills] .skill-cards h3,.utility-dialog[data-view=skills] .skill-cards p{margin:0!important;line-height:1.7}
+.utility-dialog[data-view=skills] .skill-cards button{justify-self:start;margin:0!important}
+.utility-dialog[data-view=skills] #skillMessage{margin:12px 0 0;padding:0}
+.utility-dialog[data-view=skills] #skillMessage:empty{display:none}
+@media(max-width:650px){.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]){--dialog-space:16px}.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) .dialog-heading{padding-top:12px;padding-bottom:12px}.utility-dialog:is([data-view=help],[data-view=feedback],[data-view=skills]) #utilityContent{padding-top:16px;padding-bottom:16px}.utility-dialog[data-view=skills] .skill-cards article{padding:12px}}
