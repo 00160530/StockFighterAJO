@@ -86,3 +86,7 @@ js/tutorial.js 提供分模式步驟、完成記憶、首次教學判斷與 Tour
 
 js/theatre.js 提供已知分割還原、最近買入價反應、連跌觸發、台詞洗牌及動畫價位的純邏輯。js/support.js 以 modal 與 Canvas 呈現演出，日期 Runner 的 paint 會等待互動 Promise 結束，因此沒有額外日期前進。css/theatre.css 控制聚光、手指和點擊特效。supportGames 只保存演出紀錄，不參與帳戶、勝負與排行榜。規格見 [THEATRE.md](THEATRE.md)。
 
+
+## v0.8.2 賣壓事件選擇
+
+supportContext 依 chipCutoff 取得上一交易日已公布三大法人合計，結合當日大盤與持股收盤下跌產生候選。supportGame.offer 先顯示獨立的劇情選擇 modal，只有 use 決定才呼叫動畫 open；decline 不執行動畫。supportGames.choice 保存 pending／use／decline，重新載入 pending 會恢復選擇；引擎 next 會阻擋未選事件前進，其他新聞事件與三日交易窗口不改寫。

@@ -65,3 +65,6 @@ Use case: lighting-weather and precise palette edit. Edit target: supplied rente
 
 新增 assets/xiaojiu-serious.webp（1536 × 1024，透明背景），用於空手看跌及首頁「這次不一樣」。內建 imagegen 生成後只轉 WebP，角色設計沿用小韭；完整提示詞在 [THEATRE.md](THEATRE.md)。手指為原創 SVG；聚光、放大 K 棒、衝擊圈與文字為程式動畫。
 
+0.8.2：新增 assets/support-hand.svg，原創程式向量，食指橫向伸出、其餘手指握拳，以白色袖口及灰綠細節配合小韭。接觸點與 K 棒共用座標錨點；放大比例依當日開盤到最低價計算，讓 0050 窄幅 K 棒也能準確托在手指上。秘技切入條、速度線、衝擊與支撐碎片由 CSS／Canvas 繪製。
+
+

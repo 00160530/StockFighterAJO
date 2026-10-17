@@ -38,7 +38,7 @@ class Player{
  }
  sfx(kind='click'){if(!this.enabled||this.volume===0||!this.unlocked||this.hidden)return;try{
   this.context??=new(root.AudioContext||root.webkitAudioContext)();this.context.resume().catch(()=>{});
-  const fx={'support-hit':{type:'triangle',from:880,to:320,duration:.09,level:.08},'support-break':{type:'sawtooth',from:180,to:42,duration:.5,level:.10},'support-start':{type:'triangle',from:260,to:800,duration:.22,level:.07}}[kind]||{type:'sine',from:kind==='trade'?660:kind==='next'?440:540,duration:.1,level:.07};
+  const fx={'support-impact':{type:'triangle',from:1500,to:120,duration:.17,level:.09},'support-hit':{type:'triangle',from:880,to:320,duration:.09,level:.08},'support-break':{type:'sawtooth',from:180,to:42,duration:.5,level:.10},'support-start':{type:'triangle',from:260,to:800,duration:.22,level:.07}}[kind]||{type:'sine',from:kind==='trade'?660:kind==='next'?440:540,duration:.1,level:.07};
   const t=this.context.currentTime;if(kind==='support-hit'&&this.lastSupportHit!==undefined&&t-this.lastSupportHit<.035)return;if(kind==='support-hit')this.lastSupportHit=t;const osc=this.context.createOscillator(),gain=this.context.createGain();osc.connect(gain);gain.connect(this.context.destination);osc.type=fx.type;osc.frequency.setValueAtTime(fx.from,t);if(fx.to)osc.frequency.exponentialRampToValueAtTime(fx.to,t+fx.duration);gain.gain.setValueAtTime(this.volume*fx.level,t);gain.gain.exponentialRampToValueAtTime(.0001,t+fx.duration);osc.start(t);osc.stop(t+fx.duration+.01);
  }catch{}}
 }

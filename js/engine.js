@@ -40,7 +40,7 @@ function createMarket(data){
   if(paid)cb?.('dividend',`股利入帳 ${money(paid).toLocaleString('zh-TW')} 元`);return paid;
  }
  function fresh(mode='free'){if(!['life','free'].includes(mode))throw Error('未知遊戲模式');return {version:VERSION,mode,...(mode==='life'?{life:{until:-1,openedAt:-1,anchorId:null,windows:0}}:{}),datasetEnd:data.end,day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
- const canTrade=s=>s.status==='playing'&&!s.opening&&!s.activeEvent&&(s.mode!=='life'||(s.day>=0&&s.day<=s.life.until));
+ const canTrade=s=>s.status==='playing'&&!s.opening&&!s.activeEvent&&!s.supportGames?.some(g=>g.choice==='pending')&&(s.mode!=='life'||(s.day>=0&&s.day<=s.life.until));
  function openWindow(s,id){if(s.mode!=='life')return;const until=Math.min(s.day+2,data.calendar.length-1);if(s.life.anchorId!==id)s.life.windows++;s.life={...s.life,openedAt:s.day,until:Math.max(s.life.until,until),anchorId:id};}
  function migrateLegacy(s){if(s.mode!==undefined)return s;s.mode='life';s.life={until:Math.min(s.day+2,data.calendar.length-1),openedAt:s.day,anchorId:'legacy-resume',windows:1,eligibleForUnlock:s.status==='playing'};return s;}
  function queue(s,id,side,qty,sizeMode='fixed'){
@@ -59,7 +59,7 @@ function createMarket(data){
  function cancel(s,id){const n=s.orders.length;s.orders=s.orders.filter(o=>o.id!==id);if(n!==s.orders.length)record(s,'cancel',`取消 ${id} 委託`);}
  function finish(s){const v=equity(s,date(s)),b=equity(s.benchmark,date(s));if(v<=0)s.status='bankrupt';else if(s.day===data.calendar.length-1)s.status=data.end<data.target?'awaiting-data':v>b?'won':'lost';}
  function next(s){
-  if(s.status!=='playing')return false;if(s.activeEvent)throw Error('請先完成劇情選擇');
+  if(s.status!=='playing')return false;if(s.activeEvent)throw Error('請先完成劇情選擇');if(s.supportGames?.some(g=>g.choice==='pending'))throw Error('請先完成支撐線事件選擇');
   if(s.day>=data.calendar.length-1){finish(s);return false;}
   s.day++;const d=date(s);corporate(s,d,(type,t)=>record(s,type,t));
   const paid=corporate(s.benchmark,d);
@@ -78,7 +78,7 @@ function createMarket(data){
  function choose(s,event,choice){if(s.activeEvent!==event.id)throw Error('劇情狀態不符');if(!event.choices.includes(choice))throw Error('未知的劇情選項');if(choice.cost)spend(s,choice.cost);s.stress=Math.max(0,Math.min(100,s.stress+(choice.stress||0)));s.seen.push(event.id);s.activeEvent=null;record(s,'story',`${event.title}／${choice.label}${choice.cost?'（支出 '+choice.cost+' 元）':''}`);}
  function trigger(s,events){if(s.activeEvent||s.status!=='playing'||s.opening)return;const d=date(s);const e=events.find(e=>!s.seen.includes(e.id)&&(e.exact?e.date===d:e.date<=d)&&(!e.until||d<=e.until)&&(!e.when||e.when(s)));if(e){s.activeEvent=e.id;openWindow(s,e.id);}}
  function validate(raw){
-  if(raw?.supportGames!==undefined&&(!Array.isArray(raw.supportGames)||raw.supportGames.length>100||!raw.supportGames.every((g,i,a)=>g&&data.instruments[g.id]?.tradable&&data.calendar.includes(g.date)&&g.date<=date(raw)&&Number.isSafeInteger(g.taps)&&g.taps>=0&&g.taps<=10000&&typeof g.finished==='boolean'&&(!i||g.date>a[i-1].date))))throw Error('存檔支撐線紀錄不正確');
+  if(raw?.supportGames!==undefined&&(!Array.isArray(raw.supportGames)||raw.supportGames.length>100||!raw.supportGames.every((g,i,a)=>g&&data.instruments[g.id]?.tradable&&data.calendar.includes(g.date)&&g.date<=date(raw)&&Number.isSafeInteger(g.taps)&&g.taps>=0&&g.taps<=10000&&typeof g.finished==='boolean'&&(!i||g.date>a[i-1].date)&&(g.choice===undefined||['pending','use','decline'].includes(g.choice))&&(g.choice!=='pending'||(!g.finished&&g.taps===0&&g.date===date(raw)&&i===a.length-1&&raw.mode==='life'&&raw.status==='playing'&&raw.holdings?.[g.id]))&&(g.choice!=='decline'||(g.finished&&g.taps===0)))))throw Error('存檔支撐線紀錄不正確');
   if(raw?.tutorialPending!==undefined&&typeof raw.tutorialPending!=='boolean')throw Error('存檔教學狀態不正確');
   if(!raw||raw.version!==VERSION||raw.datasetEnd!==data.end)throw Error('存檔版本或資料範圍不相容');
   if(raw.mode!==undefined&&!['life','free'].includes(raw.mode))throw Error('存檔模式不正確');
