@@ -81,3 +81,8 @@ js/playback.js 的 Runner 在每個引擎 next 後先 paint，再等待可調間
 ## v0.7 教學層
 
 js/tutorial.js 提供分模式步驟、完成記憶、首次教學判斷與 Tour 控制器。人生 9 步、自由 3 步；狀態與模態保護、重新載入流程見 [TUTORIAL.md](TUTORIAL.md)。教學規則不參與資產計算或排行榜評分。
+
+## v0.8 內心劇場與互動演出
+
+js/theatre.js 提供已知分割還原、最近買入價反應、連跌觸發、台詞洗牌及動畫價位的純邏輯。js/support.js 以 modal 與 Canvas 呈現演出，日期 Runner 的 paint 會等待互動 Promise 結束，因此沒有額外日期前進。css/theatre.css 控制聚光、手指和點擊特效。supportGames 只保存演出紀錄，不參與帳戶、勝負與排行榜。規格見 [THEATRE.md](THEATRE.md)。
+

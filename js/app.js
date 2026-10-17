@@ -15,6 +15,8 @@ function syncEvent(){market.trigger(state,story.events);eventSystem.ensureChat(s
 let screen='title',previewMode=null,book={version:1,runs:[]},recordSignature='';
 const music=new TaiguMusic.Player(updateMusicUI);
 const chart=new TaiguChart($('marketChart'),$('chartTooltip'),market);
+const nextTitleQuip=TaiguTheatre.quips();let titleQuipTimer;
+const theatre=TaiguTheatre.create(market),supportGame=new TaiguSupport.Scene({dialog:$('supportDialog'),sound:kind=>music.sfx(kind)});
 let tutorialProfile=TaiguTutorial.profile(null);try{tutorialProfile=TaiguTutorial.profile(JSON.parse(localStorage.getItem(KEY+'.tutorial')||'null'));}catch{}
 const tutorial=new TaiguTutorial.Tour({dialog:$('tutorialDialog'),onStep:step=>{$('gameMenu').open=['menu','free-menu'].includes(step?.id);},onEnd:finishTutorial});
 function tutorialLocked(){return tutorial.active||TaiguTutorial.needs(state,tutorialProfile);}
@@ -62,14 +64,16 @@ function render(resetChart=false){
 }
 let lastReply='';
 function renderStory(){
- const ev=story.events.find(e=>e.id===state.activeEvent);
+ const ev=story.events.find(e=>e.id===state.activeEvent),reaction=!ev&&state.mode==='life'&&state.day>=0&&(busy||playbackPaused)?theatre.reaction(state,selected):null,panel=document.querySelector('.story-panel');
+ if(reaction)panel.dataset.reaction=reaction.kind;else delete panel.dataset.reaction;
  $('storyChoices').innerHTML='';
  if(ev){$('storySpeaker').textContent=ev.speaker;$('storyTag').textContent=ev.tag;$('storyTitle').textContent=ev.title;$('storyText').textContent=eventSystem.textFor(ev,state);$('storyHint').innerHTML=ev.newsId?'<button id="currentNewsBtn">新聞事實與來源 ↗</button><span>完成選擇後可操作股票</span>':'<span>完成選擇後，才能繼續推進時間。</span>';if(ev.newsId)$('currentNewsBtn').onclick=()=>showNews(ev.newsId);
   ev.choices.forEach(choice=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=choice.label;btn.disabled=tutorialLocked()||(choice.cost||0)>state.cash;btn.onclick=()=>{if(tutorialLocked())return;try{market.choose(state,ev,choice);lastReply=choice.reply;beep();changed();if(choice.openGroup)showGroup();}catch(e){notify(e.message);}};$('storyChoices').append(btn);});
  }else{$('storySpeaker').textContent='小韭';$('storyTag').textContent='內心獨白・下一步由你決定';$('storyTitle').textContent=state.day<0?'一百萬，不是一串數字。':state.orders.length?'下好委託，也放下手機。':'市場還在，先想清楚。';$('storyText').textContent=lastReply||(state.day<0?'那是五年不敢亂花的薪水。上一輪，我把決定交給群組。這一輪，先學著把決定拿回來。':'看過價格，記下理由。今天不交易，也是一種決定。');$('storyHint').textContent=state.mode==='life'?'操作期結束後自動逐日播放，到下一事件停下。':'群組台詞為原創，新聞依當時已公開資料解鎖。';}
+ if(reaction){$('storySpeaker').textContent='小韭';$('storyTag').textContent=reaction.id+' · 行情心情';$('storyTitle').textContent=reaction.title;$('storyText').textContent=reaction.text;$('storyHint').textContent=reaction.tag+'（價格比較，未計股利與費稅）';}
  const lead=market.equity(state,market.date(state))-market.equity(state.benchmark,market.date(state));
- const emotion=ev&&/恐懼|風險|錯失/.test(ev.tag)?2:state.stress>60?3:state.day<0?0:lead>100000?4:lead>0?1:state.stress<6?5:0;
- document.querySelectorAll('#gameShell .character-sprite').forEach(el=>{el.style.setProperty('--sprite-x',(emotion%3)*50+'%');el.style.setProperty('--sprite-y',Math.floor(emotion/3)*100+'%');});
+ const emotion=reaction?reaction.emotion:ev&&/恐懼|風險|錯失/.test(ev.tag)?2:state.stress>60?3:state.day<0?0:lead>100000?4:lead>0?1:state.stress<6?5:0;
+ document.querySelectorAll('#gameShell .character-sprite').forEach(el=>{el.dataset.face=emotion==='serious'?'serious':'';const face=typeof emotion==='number'?emotion:0;el.style.setProperty('--sprite-x',(face%3)*50+'%');el.style.setProperty('--sprite-y',Math.floor(face/3)*100+'%');});
 }
 function renderTrade(){
  const inst=data.instruments[selected],p=quote(selected).r?.[4]||0;if(quantityMode==='all')$('quantity').value=side==='buy'?market.affordable(state.cash,p||1):(state.holdings[selected]?.qty||0);const qty=Number($('quantity').value),valid=Number.isSafeInteger(qty)&&qty>0;
@@ -107,8 +111,13 @@ function renderPortfolio(){
 }
 async function advance(count,skipWindow=false){
  if(busy||state.status!=='playing')return;if(tutorialLocked()){showTutorial(true);return;}if(state.activeEvent){notify('先完成小韭的劇情選擇。');return;}if(skipWindow&&state.mode==='life')state.life.until=state.day-1;playbackPaused=false;busy=true;$('orderMessage').textContent='';render();let moved=0;
- try{moved=await playback.run({limit:state.mode==='life'?data.calendar.length:count,step:()=>{if(!market.next(state))return false;lastReply='';syncEvent();return true;},paint:()=>{chart.offset=0;render();save();},shouldStop:()=>!!state.activeEvent||state.status!=='playing'||(state.mode==='life'&&market.canTrade(state)),interval:()=>state.mode==='life'?Number($('playbackSpeed').value):0});beep('next');}
+ try{moved=await playback.run({limit:state.mode==='life'?data.calendar.length:count,step:()=>{if(!market.next(state))return false;lastReply='';syncEvent();return true;},paint:async()=>{chart.offset=0;render();save();const candidate=!playback.stopped?theatre.supportCandidate(state,selected):null;if(candidate)await playSupport(candidate);},shouldStop:()=>!!state.activeEvent||state.status!=='playing'||(state.mode==='life'&&market.canTrade(state)),interval:()=>state.mode==='life'?Number($('playbackSpeed').value):0});beep('next');}
  catch(e){notify('無法推進：'+e.message);}finally{busy=false;playbackPaused=playback.stopped&&state.status==='playing'&&!state.activeEvent;save();render();if(playbackPaused)notify('已暫停在 '+market.date(state)+'。可查看行情，再繼續播放。');else if((count>1||state.mode==='life')&&moved)notify('已播放 '+moved+' 個交易日'+(state.activeEvent?'，遇到新的劇情。':'。'));}
+}
+async function playSupport(candidate){
+ const prior={selected,range:chart.range,offset:chart.offset},entry=theatre.begin(state,candidate);selected=candidate.id;chart.offset=0;render(true);save();
+ try{const promise=supportGame.open({...candidate,doneLabel:state.activeEvent?'繼續當日事件 →':'繼續播放行情 →',onTap:taps=>{entry.taps=taps;}});syncMusic();const result=await promise;theatre.finish(state,entry,result.taps);}
+ finally{selected=prior.selected;chart.range=prior.range;chart.offset=prior.offset;save();render();syncMusic();}
 }
 function showIntro(isReplay=false){playback.stop();replay=isReplay;introIndex=0;for(const p of story.opening){const img=new Image();img.src=p.cg;}renderIntro();if(!$('introDialog').open)$('introDialog').showModal();syncMusic();}
 function renderIntro(){
@@ -120,12 +129,12 @@ function closeIntro(){if(!replay){state.opening=false;if(!tutorialProfile[state.
 function utility(title,html){if(busy)playback.stop();previewMode=null;syncMusic();$('utilityTitle').textContent=title;$('utilityContent').innerHTML=html;if(!$('utilityDialog').open)$('utilityDialog').showModal();}
 function download(name,text,type='application/json'){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function exportSave(){download('台股戰士-'+market.date(state)+'.json',JSON.stringify(pack(),null,2));}
-function syncMusic(){const ev=story.events.find(e=>e.id===state.activeEvent);music.setMode(previewMode||($('introDialog').open?story.opening[introIndex].music:TaiguMusic.modeFor(screen,ev)));}
+function syncMusic(){const ev=story.events.find(e=>e.id===state.activeEvent);music.setMode(supportGame.active?'panic':previewMode||($('introDialog').open?story.opening[introIndex].music:TaiguMusic.modeFor(screen,ev)));}
 function updateMusicUI(info){
  $('bgmName').textContent=info.title;
  $('bgmStatus').textContent=!info.enabled?'背景音樂已關閉':info.volume===0?'音量為零':info.hidden?'切換分頁，音樂已暫停':!info.unlocked||info.blocked?'點一下，讓音樂開始。':info.error?'音檔未能播放，請確認 audio 資料夾。':info.playing?info.mood+' · '+info.bpm+' BPM':'音樂準備中…';
  $('bgmToggle').textContent=info.enabled&&info.unlocked?'♫':'♪';$('bgmToggle').setAttribute('aria-pressed',info.enabled);$('bgmToggle').setAttribute('aria-label',!info.unlocked?'開啟背景音樂':info.enabled?'關閉背景音樂':'開啟背景音樂');
- $('bgmVolume').value=Math.round(info.volume*100);$('soundBtn').querySelector('span').textContent=info.enabled?'BGM 設定':'BGM 關';
+ $('supportMute').textContent=info.enabled?'♫ 靜音':'♪ 開啟聲音';$('supportMute').setAttribute('aria-pressed',!info.enabled);$('bgmVolume').value=Math.round(info.volume*100);$('soundBtn').querySelector('span').textContent=info.enabled?'BGM 設定':'BGM 關';
  $('bgmName').parentElement.dataset.mode=info.mode;
  const mute=$('dialogMusicToggle');if(mute){mute.textContent=info.enabled?'關閉背景音樂':'開啟背景音樂';mute.setAttribute('aria-pressed',info.enabled);}
  if($('dialogMusicVolume'))$('dialogMusicVolume').value=Math.round(info.volume*100);
@@ -219,7 +228,9 @@ function showResult(){syncProgression();const d=market.date(state),e=market.equi
  document.querySelector('#gameMenu nav').addEventListener('click',e=>{if(e.target.closest('button'))$('gameMenu').open=false;});
  document.addEventListener('click',e=>{if(!tutorial.active&&!e.target.closest('#gameMenu'))$('gameMenu').open=false;});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!tutorial.active)$('gameMenu').open=false;});
- $('soundBtn').onclick=showMusic;$('bgmSettings').onclick=showMusic;$('menuStart').onclick=()=>startFromMenu('life');$('menuFree').onclick=()=>startFromMenu('free');$('menuContinue').onclick=enterGame;$('menuSaves').onclick=showSaves;$('menuLast').onclick=()=>showRunStats('last');$('menuBest').onclick=()=>showRunStats('best');$('menuHelp').onclick=showHelp;$('homeBtn').onclick=showTitle;
+ function sayTitleQuip(){const q=nextTitleQuip(),el=$('titleCharacter'),bubble=$('titleBubble'),mobile=$('titleMobileQuip'),face=typeof q.emotion==='number'?q.emotion:0;bubble.textContent=mobile.textContent=q.text;mobile.dataset.speaking='true';clearTimeout(titleQuipTimer);titleQuipTimer=setTimeout(()=>{delete mobile.dataset.speaking;},4500);el.dataset.face=q.emotion==='serious'?'serious':'';el.style.setProperty('--sprite-x',(face%3)*50+'%');el.style.setProperty('--sprite-y',Math.floor(face/3)*100+'%');}
+ let titlePointerType='mouse';$('titleCharacter').addEventListener('pointerdown',e=>{titlePointerType=e.pointerType;});$('titleCharacter').addEventListener('pointerenter',e=>{if(e.pointerType!=='touch')sayTitleQuip();});$('titleCharacter').addEventListener('pointerleave',()=>{const el=$('titleCharacter');delete el.dataset.face;el.style.setProperty('--sprite-x','0%');el.style.setProperty('--sprite-y','0%');});$('titleCharacter').onclick=e=>{if(e.detail===0||titlePointerType==='touch')sayTitleQuip();};$('titleCharacter').onfocus=()=>{if($('titleCharacter').matches(':focus-visible'))sayTitleQuip();};
+ $('supportMute').onclick=()=>music.setEnabled(!music.enabled);$('soundBtn').onclick=showMusic;$('bgmSettings').onclick=showMusic;$('menuStart').onclick=()=>startFromMenu('life');$('menuFree').onclick=()=>startFromMenu('free');$('menuContinue').onclick=enterGame;$('menuSaves').onclick=showSaves;$('menuLast').onclick=()=>showRunStats('last');$('menuBest').onclick=()=>showRunStats('best');$('menuHelp').onclick=showHelp;$('homeBtn').onclick=showTitle;
  $('bgmToggle').onclick=()=>{if(!music.unlocked){music.setEnabled(true);music.unlock();}else music.setEnabled(!music.enabled);};
  $('bgmVolume').oninput=()=>music.setVolume(Number($('bgmVolume').value)/100);
  function unlockAudio(e){if(e.target.closest?.('#bgmToggle'))return;if(e.type==='keydown'&&!['Enter',' '].includes(e.key))return;if(!music.unlocked||music.blocked)music.unlock();}

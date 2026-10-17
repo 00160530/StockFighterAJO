@@ -60,3 +60,8 @@ Use case: lighting-weather and precise palette edit. Edit target: supplied rente
 ## v0.6 序章 CG
 
 六張專屬 CG 已取代序章固定房間與表情貼圖。依頁面切換整張圖，使用中性白、灰與少量淡綠，完整提示詞及檔案見 [INTRO_CG.md](INTRO_CG.md)。卡車事故直接以無血腥漫畫撞擊呈現，取消舊版亮度閃光。
+
+## v0.8 認真表情與支撐線
+
+新增 assets/xiaojiu-serious.webp（1536 × 1024，透明背景），用於空手看跌及首頁「這次不一樣」。內建 imagegen 生成後只轉 WebP，角色設計沿用小韭；完整提示詞在 [THEATRE.md](THEATRE.md)。手指為原創 SVG；聚光、放大 K 棒、衝擊圈與文字為程式動畫。
+
