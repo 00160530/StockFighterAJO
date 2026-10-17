@@ -88,6 +88,7 @@ body.at-title{--title-dock-height:44px;height:auto;min-height:100dvh;overflow-x:
 .title-wordmark .title-final-character{position:relative;display:inline-block;font:inherit}
 .title-wordmark #titleHeading .title-catchphrase{left:calc(50% + clamp(20px,2.5vw,36px));right:auto;top:-22px;translate:-50% 0;font-style:italic;line-height:1.3;letter-spacing:.04em}
 @media(max-width:760px){.title-wordmark #titleHeading .title-catchphrase{top:-17px}}
+@media(max-width:350px){.title-wordmark #titleHeading .title-catchphrase{left:calc(50% + 12px)}}
 @media(max-width:760px){
  .at-title .title-illustration{top:169px}
  .at-title .title-actions{margin-top:max(86px,calc(min(42vw,210px) - 78px))}
