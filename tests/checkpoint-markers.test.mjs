@@ -21,3 +21,11 @@ test('dense marker layout limits full labels and merges nearby markers while kee
  const rows=Array.from({length:30},(_,i)=>['d'+i,100,102,98,101]),groups=rows.map(r=>({date:r[0],entries:[{date:r[0],title:r[0],category:'新聞'}]})),marks=c.TaiguChartEvents.layout(groups,rows,i=>10+i*9,()=>60,400,150);
  assert.ok(marks.length<groups.length);assert.equal(marks.reduce((n,m)=>n+m.entries.length,0),30);assert.ok(marks.filter(m=>m.full).length<=4);assert.ok(marks.every(m=>m.left>=4&&m.top>=6));
 });
+test('March 13 news retains its label beside March 12 story and after earlier annotations',()=>{
+ const dates=['2020-01-02','2020-01-30','2020-03-12','2020-03-13','2020-04-22'],categories=['劇情','技術','劇情','新聞','技術'],rows=dates.map(d=>[d,100,102,98,101]),groups=dates.map((date,i)=>({date,entries:[{date,title:date,category:categories[i]}]})),positions=[20,150,400,410,600],marks=c.TaiguChartEvents.layout(groups,rows,i=>positions[i],()=>100,900,200),news=marks.find(m=>m.date==='2020-03-13'),story=marks.find(m=>m.date==='2020-03-12');
+ assert.ok(news.full);assert.equal(news.label,'新聞');assert.ok(story.full);assert.ok(Math.abs(news.top-story.top)>=26);assert.equal(marks.reduce((sum,m)=>sum+m.entries.length,0),5);
+});
+test('news attached to a story is classified as news and takes priority when label slots are full',()=>{
+ const events=[{id:'crash',type:'main',newsId:'market-crash',title:'全球股災'}],s={log:[{date:'2020-03-13',type:'story',text:'全球股災／確認'}]},groups=c.TaiguChartEvents.collect(s,events,'2020-06-30');assert.equal(groups[0].entries[0].category,'新聞');
+ const rows=Array.from({length:7},(_,i)=>['day'+i,100,102,98,101]),dense=rows.map((r,i)=>({date:r[0],entries:[{date:r[0],title:r[0],category:i===6?'新聞':'技術'}]})),marks=c.TaiguChartEvents.layout(dense,rows,i=>15+i*45,()=>90,400,160);assert.ok(marks.at(-1).full);assert.equal(marks.at(-1).label,'新聞');assert.ok(marks.filter(m=>m.full).length<=4);
+});

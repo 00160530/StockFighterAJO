@@ -8,12 +8,12 @@ function tradeStats(data,log){
  for(const l of log){
   if(l.type!=='fill')continue;
   if(!data.instruments[l.id]?.tradable||!['buy','sell'].includes(l.side)||!Number.isSafeInteger(l.qty)||l.qty<1||!['price','value','fee','tax'].every(k=>Number.isFinite(l[k])&&l[k]>=0)||l.price<=0||!/^\d{4}-\d{2}-\d{2}$/.test(l.date)||l.date<lastDate){complete=false;continue;}
-  lastDate=l.date;while(splitIndex<splits.length&&splits[splitIndex].date<=l.date){const sp=splits[splitIndex++];if(holdings[sp.id])holdings[sp.id].qty*=sp.ratio;}
-  fees+=l.fee;tax+=l.tax;const h=holdings[l.id]||{qty:0,cost:0};
-  if(l.side==='buy'){buys++;h.qty+=l.qty;h.cost=money(h.cost+l.value+l.fee);holdings[l.id]=h;}
+  lastDate=l.date;while(splitIndex<splits.length&&splits[splitIndex].date<=l.date){const sp=splits[splitIndex++];for(const key of [sp.id,sp.id+':margin'])if(holdings[key])holdings[key].qty*=sp.ratio;}
+  fees+=l.fee;tax+=l.tax;const key=l.id+(l.financing==='margin'?':margin':''),h=holdings[key]||{qty:0,cost:0};
+  if(l.side==='buy'){buys++;h.qty+=l.qty;h.cost=money(h.cost+l.value+l.fee);holdings[key]=h;}
   else{sells++;if(l.qty>h.qty){complete=false;continue;}
-   const remainingCost=money(h.cost*(h.qty-l.qty)/h.qty),costBasis=money(h.cost-remainingCost),proceeds=money(l.value-l.fee-l.tax),pnl=money(proceeds-costBasis);
-   sales.push({id:l.id,date:l.date,qty:l.qty,price:l.price,costBasis,proceeds,pnl,returnPct:costBasis?pnl/costBasis*100:0});h.qty-=l.qty;h.cost=remainingCost;if(!h.qty)delete holdings[l.id];
+   const remainingCost=money(h.cost*(h.qty-l.qty)/h.qty),costBasis=money(h.cost-remainingCost+(l.financing==='margin'?(l.interestPaid||0):0)),proceeds=money(l.value-l.fee-l.tax),pnl=money(proceeds-costBasis);
+   sales.push({id:l.id,date:l.date,qty:l.qty,price:l.price,costBasis,proceeds,pnl,returnPct:costBasis?pnl/costBasis*100:0,...(l.financing==='margin'?{financing:'margin',interestPaid:l.interestPaid||0}:{})});h.qty-=l.qty;h.cost=remainingCost;if(!h.qty)delete holdings[key];
   }
  }
  const maxGain=sales.filter(s=>s.pnl>0).reduce((best,s)=>!best||s.pnl>best.pnl?s:best,null),maxLoss=sales.filter(s=>s.pnl<0).reduce((worst,s)=>!worst||s.pnl<worst.pnl?s:worst,null);
@@ -22,20 +22,22 @@ function tradeStats(data,log){
 function snapshot(market,s,reason='current',now=new Date().toISOString()){
  const mode=s.life?.eligibleForUnlock===false?'free':s.mode||'free',date=market.date(s),equity=market.equity(s,date),benchmark=market.equity(s.benchmark,date),log=s.log||[];
  let peak=1000000,drawdown=0;for(const h of s.history){peak=Math.max(peak,h.player);drawdown=Math.max(drawdown,(peak-h.player)/peak*100);}
- return {id:s.runId,at:now,date:s.day<0?'2020-01-01':date,status:s.status,reason,mode,ruleset:mode==='life'?'tw-life-v1':'tw-v1',datasetEnd:market.data.end,sessions:s.day+1,equity,benchmark,cash:s.cash,returnPct:(equity/1e6-1)*100,alpha:(equity-benchmark)/1e6*100,maxDrawdown:drawdown,...tradeStats(market.data,log),spent:s.spent,choices:s.seen.length};
+ const margin=market.marginInfo(s),financing=margin.totalBorrowed>0?'margin':'cash';
+ const skillUses={mother:log.filter(l=>l.type==='skill-loan').length,vip:log.filter(l=>l.type==='skill-vip').length,divination:log.filter(l=>l.type==='skill-divination').length};
+ return {id:s.runId,rewardRootId:s.rewardRootId||s.runId,playTimeMs:Number.isSafeInteger(s.playTimeMs)&&s.playTimeMs>=0?s.playTimeMs:null,playTimePartial:s.playTimePartial===true,skillUses,at:now,date:s.day<0?'2020-01-01':date,status:s.status,reason,mode,ruleset:(mode==='life'?'tw-life-v1':'tw-v1')+(financing==='margin'?':margin-v1':''),datasetEnd:market.data.end,sessions:s.day+1,equity,benchmark,cash:s.cash,returnPct:(equity/1e6-1)*100,alpha:(equity-benchmark)/1e6*100,maxDrawdown:drawdown,...tradeStats(market.data,log),spent:s.spent,choices:s.seen.length,financing,margin:{totalBorrowed:margin.totalBorrowed,totalInterest:margin.totalInterest,interestPaid:margin.interestPaid,totalTopups:margin.totalTopups,liquidations:margin.liquidations,principal:margin.principal,interest:margin.interest,collateral:margin.collateral},bankruptcyReason:s.bankruptcyReason||null};
 }
 function inventory(market,s){
  const date=market.date(s),rows=Object.entries(s.holdings).map(([id,h])=>{
   const inst=market.data.instruments[id],priceBar=market.latest(id,date),price=priceBar?.[4]||0,value=money(price*h.qty),pnl=money(value-h.cost);
   const trades=s.log.filter(l=>l.type==='fill'&&l.id===id&&l.date<=date),splits=(inst.splits||[]).filter(sp=>sp.date<=date).slice().sort((a,b)=>a.date.localeCompare(b.date));let qty=0,firstBuy=null,lastBuy=null,si=0;
   for(const t of trades){while(si<splits.length&&splits[si].date<=t.date)qty*=splits[si++].ratio;if(t.side==='buy'){if(!qty)firstBuy=t.date;lastBuy=t.date;qty+=t.qty;}else{qty-=t.qty;if(qty<=0){qty=0;firstBuy=null;lastBuy=null;}}}
-  return {id,name:inst.name,qty:h.qty,cost:h.cost,average:h.cost/h.qty,price,priceDate:priceBar?.[0],value,pnl,returnPct:h.cost?pnl/h.cost*100:0,firstBuy,lastBuy,trades};
+  const credit=s.margin?.positions[id];return {id,name:inst.name,qty:h.qty,cost:h.cost,average:h.cost/h.qty,price,priceDate:priceBar?.[0],value,pnl,returnPct:h.cost?pnl/h.cost*100:0,firstBuy,lastBuy,trades,marginQty:credit?.qty||0,cashQty:h.qty-(credit?.qty||0),principal:credit?.principal||0,interest:credit?.interest||0};
  });
  const cost=money(rows.reduce((n,r)=>n+r.cost,0)),value=money(rows.reduce((n,r)=>n+r.value,0)),pnl=money(value-cost),receivable=money(s.receivables.reduce((n,r)=>n+r.amount,0));
  return {date,rows,cost,value,pnl,returnPct:cost?pnl/cost*100:0,cash:s.cash,receivable,equity:market.equity(s,date)};
 }
 function validStats(r){return r.statsVersion===undefined||(r.statsVersion===1&&typeof r.statsComplete==='boolean'&&['buyTrades','sellTrades','wins','losses'].every(k=>Number.isSafeInteger(r[k])&&r[k]>=0)&&(r.realizedPnl===null||Number.isFinite(r.realizedPnl))&&['maxGain','maxLoss'].every(k=>r[k]===null||(r[k]&&typeof r[k].id==='string'&&typeof r[k].date==='string'&&['qty','price','costBasis','proceeds','pnl','returnPct'].every(f=>Number.isFinite(r[k][f])))));}
-function valid(r){return !!r&&typeof r.id==='string'&&r.id.length<=120&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.at==='string'&&['playing','won','lost','bankrupt','awaiting-data'].includes(r.status)&&['current','completed','restarted'].includes(r.reason)&&['equity','benchmark','cash','returnPct','alpha','maxDrawdown','trades','fees','tax','spent','choices','sessions'].every(k=>Number.isFinite(r[k]))&&validStats(r);}
+function valid(r){return !!r&&typeof r.id==='string'&&r.id.length<=120&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.at==='string'&&['playing','won','lost','bankrupt','awaiting-data'].includes(r.status)&&['current','completed','restarted'].includes(r.reason)&&['equity','benchmark','cash','returnPct','alpha','maxDrawdown','trades','fees','tax','spent','choices','sessions'].every(k=>Number.isFinite(r[k]))&&validStats(r)&&(r.playTimeMs===undefined||r.playTimeMs===null||Number.isSafeInteger(r.playTimeMs)&&r.playTimeMs>=0)&&(r.playTimePartial===undefined||typeof r.playTimePartial==='boolean')&&(r.skillUses===undefined||r.skillUses&&['mother','vip','divination'].every(k=>Number.isSafeInteger(r.skillUses[k])&&r.skillUses[k]>=0));}
 function normalize(value){return {version:1,runs:Array.isArray(value?.runs)?value.runs.filter(valid).slice(-100):[]};}
 function best(book,mode=null){return book.runs.filter(r=>TERMINAL.includes(r.status)&&(!mode||(r.mode||'free')===mode)).slice().sort((a,b)=>b.alpha-a.alpha||b.equity-a.equity)[0]||null;}
 function upsert(book,run){if(!valid(run))throw Error('遊玩數據格式不正確');let runs=normalize(book).runs.filter(r=>r.id!==run.id);runs.push(run);const keep=[best({runs}),best({runs},'life'),best({runs},'free')].filter(Boolean);if(runs.length>100){runs=runs.slice(-97);for(const r of keep)if(!runs.some(x=>x.id===r.id))runs.unshift(r);}return {version:1,runs};}

@@ -18,7 +18,7 @@ class MarketChart{
  renderMarkers(rows,x,y,w,bottom){
   this.markerLayer.replaceChildren();this.markerLayer.hidden=!this.showEvents||!!this.fall;if(this.markerLayer.hidden||!root.TaiguChartEvents)return;
   const groups=root.TaiguChartEvents.collect(this.state,this.events,this.market.date(this.state)),marks=root.TaiguChartEvents.layout(groups,rows,x,y,w,bottom);
-  for(const mark of marks){const b=document.createElement('button');b.type='button';b.className='chart-event-marker'+(mark.full?'':' compact');b.textContent=mark.full?mark.label:mark.entries.length>1?mark.entries.length:'•';b.style.left=mark.left+'px';b.style.top=mark.top+'px';b.style.setProperty('--stem',mark.stem+'px');b.title=mark.date+' · '+mark.entries.map(e=>e.title).join('／');b.setAttribute('aria-label',b.title);b.onclick=()=>this.onAnnotation?.(mark);this.markerLayer.append(b);}
+  for(const mark of marks){const b=document.createElement('button');b.type='button';b.className='chart-event-marker'+(mark.full?'':' compact');b.textContent=mark.full?mark.label:mark.entries.length>1?mark.entries.length:'•';b.style.left=mark.left+'px';b.style.top=mark.top+'px';b.style.setProperty('--stem',mark.stem+'px');b.style.setProperty('--anchor',mark.anchor+'px');b.title=mark.date+' · '+mark.entries.map(e=>e.title).join('／');b.setAttribute('aria-label',b.title);b.onclick=()=>this.onAnnotation?.(mark);this.markerLayer.append(b);}
  }
  setRange(n){this.range=n;this.offset=0;this.hover=null;this.draw();}
  beginFall(context){this.fall={id:context.id,date:context.date,progress:0};this.fallSpot=null;this.hover=null;this.tip.hidden=true;}

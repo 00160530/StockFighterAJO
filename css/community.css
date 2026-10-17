@@ -13,3 +13,5 @@
 @media(prefers-reduced-motion:reduce){.announcement-track{animation:none;width:auto}.announcement-track span{white-space:normal;padding:0}.announcement-track [aria-hidden=true]{display:none}.announcement-window{mask-image:none}}
 .utility-dialog[data-view=feedback]{max-height:94dvh}.feedback-field input,.feedback-field textarea{font-family:inherit;font-size:13px;line-height:1.6}
 @media(min-width:761px) and (max-height:760px){.utility-dialog[data-view=feedback] .dialog-heading{padding:12px 20px}.utility-dialog[data-view=feedback] #utilityContent{padding:13px 20px}.feedback-field{margin:8px 0}.feedback-field textarea{min-height:80px}.feedback-field.steps textarea{min-height:48px}.feedback-note{padding:8px 10px;margin-bottom:11px!important}.feedback-types{margin-bottom:10px}.feedback-actions{margin-top:10px}}
+
+.announcement-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85}.official-announcement{border-left:3px solid #5b896b!important;background:#f2f8f4!important}.announcement-editor textarea{min-height:180px}.official-announcement h3{font-size:18px!important}

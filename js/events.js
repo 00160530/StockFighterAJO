@@ -62,6 +62,6 @@ function create(market,legacy,news,group){
  }
  return {events,indicators,textFor,ensureChat,news,group};
 }
-function progression(raw,state){const p={version:1,freeUnlocked:raw?.version===1&&raw.freeUnlocked===true,unlockedBy:typeof raw?.unlockedBy==='string'?raw.unlockedBy:null};if(state?.mode==='life'&&state.status==='won'&&state.life?.eligibleForUnlock!==false){p.freeUnlocked=true;p.unlockedBy=state.runId||'life-completed';}return p;}
+function progression(raw,state){const p={version:1,freeUnlocked:raw?.version===1&&raw.freeUnlocked===true,unlockedBy:typeof raw?.unlockedBy==='string'?raw.unlockedBy:null,marginUnlocked:raw?.version===1&&raw.marginUnlocked===true,marginUnlockedBy:typeof raw?.marginUnlockedBy==='string'?raw.marginUnlockedBy:null,notifiedFree:raw?.notifiedFree===true,notifiedMargin:raw?.notifiedMargin===true,marginDebtAchievement:raw?.marginDebtAchievement===true,notifiedMarginDebt:raw?.notifiedMarginDebt===true};if(state?.mode==='life'&&['won','lost'].includes(state.status)&&state.life?.eligibleForUnlock!==false){p.marginUnlocked=true;p.marginUnlockedBy=p.marginUnlockedBy||state.runId||'life-completed';if(state.status==='won'){p.freeUnlocked=true;p.unlockedBy=state.runId||'life-completed';}}if(state?.status==='bankrupt'&&state.bankruptcyReason==='margin-debt'&&state.cash<0)p.marginDebtAchievement=true;return p;}
 root.TaiguEvents={create,progression};
 })(globalThis);
