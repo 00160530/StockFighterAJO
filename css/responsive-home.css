@@ -86,7 +86,7 @@ body.at-title{--title-dock-height:44px;height:auto;min-height:100dvh;overflow-x:
 @media(prefers-reduced-motion:reduce){.at-title .title-actor,.at-title .title-stage #titleBubble{animation:none}}
 /* Anchor the flourish to the final character instead of the full wordmark. */
 .title-wordmark .title-final-character{position:relative;display:inline-block;font:inherit}
-.title-wordmark #titleHeading .title-catchphrase{left:50%;right:auto;top:-22px;translate:-50% 0;font-style:italic;line-height:1.3;letter-spacing:.04em}
+.title-wordmark #titleHeading .title-catchphrase{left:calc(50% + clamp(20px,2.5vw,36px));right:auto;top:-22px;translate:-50% 0;font-style:italic;line-height:1.3;letter-spacing:.04em}
 @media(max-width:760px){.title-wordmark #titleHeading .title-catchphrase{top:-17px}}
 @media(max-width:760px){
  .at-title .title-illustration{top:169px}
