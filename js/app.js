@@ -115,7 +115,7 @@ async function advance(count,skipWindow=false){
  catch(e){notify('無法推進：'+e.message);}finally{busy=false;playbackPaused=playback.stopped&&state.status==='playing'&&!state.activeEvent;save();render();if(playbackPaused)notify('已暫停在 '+market.date(state)+'。可查看行情，再繼續播放。');else if((count>1||state.mode==='life')&&moved)notify('已播放 '+moved+' 個交易日'+(state.activeEvent?'，遇到新的劇情。':'。'));}
 }
 async function playSupport(candidate,existing=null){
- const prior={selected,range:chart.range,offset:chart.offset},entry=existing||theatre.begin(state,candidate);selected=candidate.id;chart.offset=0;chart.range=Math.min(prior.range,12);chart.beginFall(candidate);render(true);save();
+ const prior={selected,range:chart.range,offset:chart.offset},entry=existing||theatre.begin(state,candidate);selected=candidate.id;chart.offset=0;chart.beginFall(candidate);render(true);save();
  try{const lead=supportGame.leadIn(candidate,chart);syncMusic();await lead;const choice=supportGame.offer(candidate);syncMusic();const use=await choice;theatre.decide(state,entry,use);save();if(!use){lastReply='小韭把手收回口袋：「讓它跌吧。我的手指今天先下班。」';return;}const promise=supportGame.open({...candidate,doneLabel:state.activeEvent?'繼續當日事件 →':'繼續播放行情 →',onTap:taps=>{entry.taps=taps;}});syncMusic();const result=await promise;theatre.finish(state,entry,result.taps);}
  finally{supportGame.clearLeadIn();chart.endFall();selected=prior.selected;chart.range=prior.range;chart.offset=prior.offset;save();render();syncMusic();}
 }
