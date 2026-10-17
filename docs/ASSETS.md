@@ -73,3 +73,7 @@ assets/support-hand-chibi.webp 取代演出使用的 SVG 手部。內建 imagege
 
 
 
+
+## v0.8.4 參考姿勢 Q 版裸手
+
+assets/support-hand-reference.webp 取代上一版手部。以使用者提供的食指微彎裸手圖作姿勢參考、小韭表情圖作風格參考，使用內建 imagegen 重畫。保持透明背景、無衣袖，僅無損轉換 WebP。提示詞見 [HAND_ASSET.md](HAND_ASSET.md)。

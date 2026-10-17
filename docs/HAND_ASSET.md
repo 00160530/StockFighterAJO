@@ -2,7 +2,20 @@
 >
 > 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
 
-# 0.8.3 Q 版手部素材
+# 0.8.4 參考姿勢 Q 版手部素材
+
+目前使用：`assets/support-hand-reference.webp`（1536 × 1024，RGBA）。使用內建 imagegen，第一張輸入為使用者提供的裸手姿勢參考，第二張為既有小韭表情圖的線條、比例與上色參考。食指微彎向左、其餘手指自然收攏，只有裸手與短手腕，沒有衣袖。生成後僅作無損 WebP 轉換，保留原生透明 alpha。動畫接觸點約 x=450、y=156。
+
+## 0.8.4 最終提示詞
+
+```text
+Use case: style-transfer. Asset type: isolated transparent chibi hand sprite for the 2D game 台股戰士.
+Reference image 1 is the user's requested POSE reference: one bare right hand seen from the side / slight three-quarter view, index points LEFT and is gently bent, thumb rests across the folded middle ring and little fingers, wrist enters lower right. Closely preserve this readable natural silhouette and the space below the index. Reference image 2 is STYLE ONLY: the actual Xiao Jiu chibi game's character sheet. Match those soft rounded shapes, dark brown clean outline and very simple flat cel shading.
+Redraw only ONE isolated hand, cuter and a little plumper than reference 1, with shorter soft rounded digits, a small palm and a short bare wrist. Keep the index's upper edge gently rounded and almost horizontal so it can prop up a falling stock candlestick; do not create a long rigid straight sausage finger. Clear thumb attachment, correct five digit anatomy, three curled fingers tucked underneath, no extra fingers. Use very few small joint lines, no detailed skin folds, no veins, no realistic knuckles. Flat neutral light pink skin and just ONE restrained pink shadow tone, outline thickness like the chibi character. No glossy realistic rendering, no painterly gradients, no 3D.
+Canvas landscape 3:2, whole hand fully visible with transparent padding; short bare wrist ends toward bottom right. Absolutely NO clothing, sleeve, cuff, glove or jewelry. No character, chart, candle, text, UI icons, watermarks, support line or light effects. Genuinely transparent background; no white backdrop, no checkerboard, no exterior shadow or colored halo. Neutral white balance, no orange/yellow color wash. Output only the new hand sprite.
+```
+
+## 0.8.3 歷史素材
 
 最終檔案：assets/support-hand-chibi.webp（1536 × 1024，RGBA，保留透明背景）。使用內建 imagegen 生成姿勢參考稿，再用內建工具改為 Q 版、裸手與短手腕，移除衣袖。生成後只做無損 WebP 格式轉換，未以程式繪製或修改手部輪廓。
 

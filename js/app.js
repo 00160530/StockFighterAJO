@@ -111,13 +111,13 @@ function renderPortfolio(){
 }
 async function advance(count,skipWindow=false){
  if(busy||state.status!=='playing')return;if(tutorialLocked()){showTutorial(true);return;}if(state.activeEvent){notify('先完成小韭的劇情選擇。');return;}if(skipWindow&&state.mode==='life')state.life.until=state.day-1;playbackPaused=false;busy=true;$('orderMessage').textContent='';render();let moved=0;
- try{moved=await playback.run({limit:state.mode==='life'?data.calendar.length:count,step:()=>{if(!market.next(state))return false;lastReply='';syncEvent();return true;},paint:async()=>{chart.offset=0;render();save();const candidate=!playback.stopped?theatre.supportCandidate(state,selected):null;if(candidate)await playSupport(candidate);},shouldStop:()=>!!state.activeEvent||state.status!=='playing'||(state.mode==='life'&&market.canTrade(state)),interval:()=>state.mode==='life'?Number($('playbackSpeed').value):0});beep('next');}
+ try{moved=await playback.run({limit:state.mode==='life'?data.calendar.length:count,step:()=>{if(!market.next(state))return false;lastReply='';syncEvent();return true;},paint:async()=>{chart.offset=0;const candidate=!playback.stopped?theatre.supportCandidate(state,selected):null;if(candidate)await playSupport(candidate);else{render();save();}},shouldStop:()=>!!state.activeEvent||state.status!=='playing'||(state.mode==='life'&&market.canTrade(state)),interval:()=>state.mode==='life'?Number($('playbackSpeed').value):0});beep('next');}
  catch(e){notify('無法推進：'+e.message);}finally{busy=false;playbackPaused=playback.stopped&&state.status==='playing'&&!state.activeEvent;save();render();if(playbackPaused)notify('已暫停在 '+market.date(state)+'。可查看行情，再繼續播放。');else if((count>1||state.mode==='life')&&moved)notify('已播放 '+moved+' 個交易日'+(state.activeEvent?'，遇到新的劇情。':'。'));}
 }
 async function playSupport(candidate,existing=null){
- const prior={selected,range:chart.range,offset:chart.offset},entry=existing||theatre.begin(state,candidate);selected=candidate.id;chart.offset=0;render(true);save();
- try{const choice=supportGame.offer(candidate);syncMusic();const use=await choice;theatre.decide(state,entry,use);save();if(!use){lastReply='小韭把手收回口袋：「讓它跌吧。我的手指今天先下班。」';return;}const promise=supportGame.open({...candidate,doneLabel:state.activeEvent?'繼續當日事件 →':'繼續播放行情 →',onTap:taps=>{entry.taps=taps;}});syncMusic();const result=await promise;theatre.finish(state,entry,result.taps);}
- finally{selected=prior.selected;chart.range=prior.range;chart.offset=prior.offset;save();render();syncMusic();}
+ const prior={selected,range:chart.range,offset:chart.offset},entry=existing||theatre.begin(state,candidate);selected=candidate.id;chart.offset=0;chart.range=Math.min(prior.range,12);chart.beginFall(candidate);render(true);save();
+ try{const lead=supportGame.leadIn(candidate,chart);syncMusic();await lead;const choice=supportGame.offer(candidate);syncMusic();const use=await choice;theatre.decide(state,entry,use);save();if(!use){lastReply='小韭把手收回口袋：「讓它跌吧。我的手指今天先下班。」';return;}const promise=supportGame.open({...candidate,doneLabel:state.activeEvent?'繼續當日事件 →':'繼續播放行情 →',onTap:taps=>{entry.taps=taps;}});syncMusic();const result=await promise;theatre.finish(state,entry,result.taps);}
+ finally{supportGame.clearLeadIn();chart.endFall();selected=prior.selected;chart.range=prior.range;chart.offset=prior.offset;save();render();syncMusic();}
 }
 async function resumeSupport(){const p=theatre.pending(state);if(!p)return;busy=true;render();try{await playSupport(p.candidate,p.row);}catch(e){notify('小劇場未能繼續：'+e.message);}finally{busy=false;playbackPaused=!state.activeEvent&&!market.canTrade(state);save();render();}}
 function showIntro(isReplay=false){playback.stop();replay=isReplay;introIndex=0;for(const p of story.opening){const img=new Image();img.src=p.cg;}renderIntro();if(!$('introDialog').open)$('introDialog').showModal();syncMusic();}
@@ -130,7 +130,7 @@ function closeIntro(){if(!replay){state.opening=false;if(!tutorialProfile[state.
 function utility(title,html){if(busy)playback.stop();previewMode=null;syncMusic();$('utilityTitle').textContent=title;$('utilityContent').innerHTML=html;if(!$('utilityDialog').open)$('utilityDialog').showModal();}
 function download(name,text,type='application/json'){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function exportSave(){download('台股戰士-'+market.date(state)+'.json',JSON.stringify(pack(),null,2));}
-function syncMusic(){const ev=story.events.find(e=>e.id===state.activeEvent);music.setMode(supportGame.active||supportGame.offering?'panic':previewMode||($('introDialog').open?story.opening[introIndex].music:TaiguMusic.modeFor(screen,ev)));}
+function syncMusic(){const ev=story.events.find(e=>e.id===state.activeEvent);music.setMode(supportGame.active||supportGame.offering||supportGame.leading?'panic':previewMode||($('introDialog').open?story.opening[introIndex].music:TaiguMusic.modeFor(screen,ev)));}
 function updateMusicUI(info){
  $('bgmName').textContent=info.title;
  $('bgmStatus').textContent=!info.enabled?'背景音樂已關閉':info.volume===0?'音量為零':info.hidden?'切換分頁，音樂已暫停':!info.unlocked||info.blocked?'點一下，讓音樂開始。':info.error?'音檔未能播放，請確認 audio 資料夾。':info.playing?info.mood+' · '+info.bpm+' BPM':'音樂準備中…';
