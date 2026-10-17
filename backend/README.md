@@ -54,3 +54,11 @@ GitHub Actions 僅測試和發布前端，Worker 部署由 Wrangler 執行。bui
 ## 玩家分享紀錄
 
 0008 新增 `sf_shared_records`，儲存玩家主動分享的顯示 JSON。`POST /v1/shares` 需匿名玩家 token、requestId 與白名單紀錄，按玩家與 IP 限頻，重試同 requestId 回傳同一份不可變紀錄。`GET /v1/shares/:id` 公開回傳顯示紀錄，不回傳玩家 ID、requestId 或 token；分享不寫入排行榜。遊戲連結使用 `?record=<id>`，直接開啟「你朋友股神的紀錄」。
+
+## 0.13.0 社群統計與調查 API
+
+0009 新增 sf_life_completions、sf_polls、sf_poll_votes、sf_community_counters，保留原有資料。`POST /v1/completions` 使用開局 Session 及現有結算檢核（含最低遊玩時長），不消耗排行榜提交資格；Session 去重，自由模式、破產、未完成不計。排行榜提交也會補記同一通關。`GET /v1/community` 回傳總完成／勝利次數與唯一進行中調查。
+
+`GET /v1/polls?page=0` 為公開歷史，每頁 50 題；提供匿名 bearer 時只附該玩家的 myChoice，不公開玩家身分。`POST /v1/polls/:id/vote` 選 yes/no，匿名身分每題僅一票，改選取代原票；在單一 SQL 內確認調查仍進行且公開，另有玩家與 IP 限頻。
+
+管理員 `GET/POST /admin/api/polls`、`POST /admin/api/polls/:id` 設定題目、active、visible。D1 部分唯一索引限制最多一題 active，切換以 batch 原子處理；active 必須 visible，已有票的題目由 DB trigger 鎖定原文。過往資料可隱藏而不刪票。管理員 `GET/POST /admin/api/community-counts` 接受 total 與 wins（非負整數且 wins≤total）；以當下自動數的差額保存，後續通關繼續累加。全部修改須管理登入、同源驗證並留下稽核紀錄。

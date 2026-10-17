@@ -4,7 +4,7 @@ const KEY='taigu-warrior.v1.online';
 class CloudError extends Error{constructor(message,code='NETWORK_ERROR',extra={}){super(message);Object.assign(this,{code,...extra});}}
 function payload(r,session,config,nickname,avatarId=1){const cents=n=>Math.round(n*100),highlight=t=>t?{symbol:t.id,date:t.date,qty:t.qty,priceCents:cents(t.price),pnlCents:cents(t.pnl)}:null;const equityCents=cents(r.equity),benchmarkCents=cents(r.benchmark);return {sessionId:session.sessionId,sessionToken:session.sessionToken,nickname,avatarId,editionId:config.editionId,mode:r.mode,playTimeMs:r.playTimeMs??null,playTimePartial:r.playTimePartial===true,skillUses:r.skillUses??null,outcome:r.status,date:r.date,sessions:r.sessions,score:Math.round((equityCents-benchmarkCents)/10000),equityCents,benchmarkCents,drawdownBps:Math.round(r.maxDrawdown*100),trades:r.trades,buyTrades:r.buyTrades,sellTrades:r.sellTrades,maxGain:r.statsComplete?highlight(r.maxGain):null,maxLoss:r.statsComplete?highlight(r.maxLoss):null,...(r.margin?.totalBorrowed>0?{margin:{totalBorrowedCents:cents(r.margin.totalBorrowed),totalInterestCents:cents(r.margin.totalInterest),interestPaidCents:cents(r.margin.interestPaid),totalTopupsCents:cents(r.margin.totalTopups),liquidations:r.margin.liquidations,principalCents:cents(r.margin.principal),interestCents:cents(r.margin.interest),collateralCents:cents(r.margin.collateral)}}:{})};}
 class Client{
- constructor({config,storage,fetcher=root.fetch?.bind(root),now=()=>Date.now()}){this.config=config;this.storage=storage;this.fetcher=fetcher;this.now=now;this.starting=new Map();this.registering=null;}
+ constructor({config,storage,fetcher=root.fetch?.bind(root),now=()=>Date.now()}){this.config=config;this.storage=storage;this.fetcher=fetcher;this.now=now;this.starting=new Map();this.completing=new Map();this.registering=null;}
  get enabled(){return !!this.config?.apiBase&&/^https:\/\//.test(this.config.apiBase);}
  read(){try{const a=JSON.parse(this.storage.getItem(KEY)||'null');return a&&a.version===1&&a.sessions&&a.receipts?a:{version:1,sessions:{},receipts:{},player:null};}catch{return {version:1,sessions:{},receipts:{},player:null};}}
  write(a){try{this.storage.setItem(KEY,JSON.stringify(a));}catch{throw new CloudError('瀏覽器無法保留匿名身分，這輪仍可繼續本機遊玩。','STORAGE_UNAVAILABLE');}}
@@ -21,6 +21,10 @@ class Client{
  async rank(mode,metric,financing='cash'){const p=this.read().player;if(!p?.playerToken)return {entry:null};return this.request('/v1/rank?mode='+encodeURIComponent(mode)+'&metric='+encodeURIComponent(metric)+'&financing='+encodeURIComponent(financing),null,p.playerToken);}
  async share(record,requestId){const p=await this.identity();return this.request('/v1/shares',{requestId,record},p.playerToken);}
   async sharedRecord(id){return this.request('/v1/shares/'+encodeURIComponent(id));}
+  async community(){return this.request('/v1/community',null,this.read().player?.playerToken);}
+  async polls(page=0){return this.request('/v1/polls?page='+page,null,this.read().player?.playerToken);}
+  async vote(id,choice){const p=await this.identity();return this.request('/v1/polls/'+encodeURIComponent(id)+'/vote',{choice},p.playerToken);}
+  async complete(r){const saved=this.read(),session=this.session(r.id);if(r.mode!=='life'||!['won','lost'].includes(r.status)||!session||saved.completions?.[r.id])return null;if(this.completing.has(r.id))return this.completing.get(r.id);const work=(async()=>{const p=await this.identity(),result=await this.request('/v1/completions',payload(r,session,this.config,'小韭'),p.playerToken),a=this.read();a.completions??={};a.completions[r.id]=true;this.write(a);return result;})();this.completing.set(r.id,work);try{return await work;}finally{this.completing.delete(r.id);}}
   async announcement(){return this.request('/v1/announcement');}
  async feedback(body){const p=await this.identity();return this.request('/v1/feedback',body,p.playerToken);}
 }
