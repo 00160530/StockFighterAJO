@@ -1,0 +1,58 @@
+/* Keep all home controls reachable when the browser is shorter than the artwork. */
+body.at-title{--title-dock-height:44px;height:auto;min-height:100dvh;overflow-x:hidden;overflow-y:auto;padding-bottom:calc(var(--title-dock-height) + env(safe-area-inset-bottom))}
+.at-title .music-dock{bottom:0;left:0;right:0;max-width:none;height:calc(var(--title-dock-height) + env(safe-area-inset-bottom));padding:5px 18px calc(5px + env(safe-area-inset-bottom));justify-content:flex-end;border-radius:0}
+.bgm-toggle{display:grid;place-items:center;padding:0;line-height:1;overflow:hidden}
+.music-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px;font-size:0;line-height:1;vertical-align:middle}
+.music-icon svg{display:block;width:20px;height:20px;overflow:visible}
+.music-icon.is-muted::after{display:none}
+.music-icon .mute-line{display:none}
+.music-icon.is-muted .mute-line{display:block}
+@media(min-width:761px){
+ .at-title .title-screen{height:auto;min-height:calc(100dvh - var(--title-dock-height));display:grid;grid-template-rows:60px minmax(min-content,1fr) auto auto;padding:0 clamp(22px,5vw,90px) 12px;overflow:hidden}
+ .at-title .title-top{height:60px;max-width:1280px;width:100%}
+ .at-title .title-layout{height:auto;min-height:0;max-width:1200px;width:100%;margin:0 auto;padding:18px 0;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(22px,3vw,45px);align-items:center}
+ .at-title .title-copy{min-width:0;padding:0}
+ .at-title .title-actions,.at-title .title-records{max-width:100%}
+ .at-title .title-illustration{height:min(580px,calc(100dvh - 190px));min-height:440px;max-height:none;width:100%;align-self:center}
+ .at-title .title-illustration:has(.home-poll) .title-character{width:min(100%,43vh);bottom:170px;left:3%}
+ .at-title .title-illustration:has(.home-poll) .title-note{right:0;bottom:205px}
+ .at-title .title-footer{height:auto;min-height:48px;padding:8px 0;gap:10px 18px;flex-wrap:wrap}
+ .at-title .announcement-bar{flex:1 1 400px;min-width:0}
+ .at-title .community-links{flex-wrap:wrap;gap:14px}
+ .at-title .achievement-strip{margin:0 auto 6px;padding:10px 0;min-width:0}
+}
+@media(min-width:761px) and (max-height:900px){
+ .at-title .title-screen{grid-template-rows:54px minmax(min-content,1fr) auto auto}
+ .at-title .title-top{height:54px}
+ .at-title .title-layout{padding:12px 0}
+ .at-title .title-illustration{height:min(500px,calc(100dvh - 210px));min-height:410px}
+ .at-title .title-copy h1{font-size:clamp(48px,5.1vw,72px);letter-spacing:4px}
+ .at-title .title-copy h1>span{font-size:13px;letter-spacing:3px;margin-top:12px}
+ .at-title .title-chapter{font-size:8px;margin-bottom:11px}
+ .at-title .title-description{font-size:12px;line-height:1.8;margin-top:13px}
+ .at-title .life-community-count{font-size:11px;margin-top:7px}
+ .at-title .life-community-count b{font-size:16px}
+ .at-title .title-actions{margin-top:14px;gap:7px}
+ .at-title .menu-primary,.at-title .menu-free{font-size:16px;padding:12px 16px;margin-bottom:3px}
+ .at-title .menu-primary small,.at-title .menu-free small{font-size:9px;margin-top:4px}
+ .at-title .menu-continue{padding:8px 14px}
+ .at-title .menu-utilities{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .at-title .menu-utilities .menu-save{display:block;padding:7px 3px;font-size:11px;line-height:1.6;white-space:normal}
+ .at-title .menu-utilities .menu-save>span{display:block;margin:3px 0 0;font-size:8px}
+ .at-title .title-unlocks{margin-top:7px;font-size:11px}
+ .at-title .title-records{margin-top:10px;gap:10px}
+ .at-title .title-records button{padding:10px 12px}
+ .at-title .title-records strong{font-size:12px;margin-top:6px}
+ .at-title .title-records small{font-size:9px;margin-top:3px}
+ .at-title .title-records .share-best{padding:3px 6px;font-size:10px}
+ .at-title .achievement-heading>span,.at-title .achievement-group>span{font-size:11px}
+ .at-title .achievement-heading small,.at-title .achievement-group small{font-size:9px}
+}
+@media(min-width:761px) and (max-width:1099px){
+ .at-title .title-layout{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}
+ .at-title .title-copy h1{font-size:clamp(42px,5.7vw,60px)}
+ .at-title .title-illustration{min-height:430px}
+ .at-title .title-bubble{right:0;font-size:11px}
+ .at-title .title-illustration:has(.home-poll) .title-bubble{right:0}
+}
+@media(max-width:760px){body.at-title{--title-dock-height:60px}.at-title .music-dock{gap:8px;padding-left:12px;padding-right:12px}.at-title .bgm-copy{min-width:0}.at-title .title-footer{height:auto}.at-title .title-screen{padding-bottom:16px}}

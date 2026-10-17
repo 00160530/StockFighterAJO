@@ -163,7 +163,7 @@ function syncMusic(){const ev=story.events.find(e=>e.id===state.activeEvent);mus
 function updateMusicUI(info){
  $('bgmName').textContent=info.title;
  $('bgmStatus').textContent=!info.enabled?'背景音樂已關閉':info.volume===0?'音量為零':info.hidden?'切換分頁，音樂已暫停':!info.unlocked||info.blocked?'點一下，讓音樂開始。':info.error?'音檔未能播放，請確認 audio 資料夾。':info.playing?info.mood+' · '+info.bpm+' BPM':'音樂準備中…';
-   const icon='<span class="music-icon'+(!info.enabled?' is-muted':'')+'" aria-hidden="true">♫</span>';$('bgmToggle').innerHTML=icon;$('bgmToggle').setAttribute('aria-pressed',info.enabled);$('bgmToggle').setAttribute('aria-label',info.enabled?'關閉背景音樂':'開啟背景音樂');
+   const icon='<span class="music-icon'+(!info.enabled?' is-muted':'')+'" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 18V6h11v10M9 9h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6" cy="18" rx="3.5" ry="2.5" fill="currentColor"/><ellipse cx="17" cy="16" rx="3.5" ry="2.5" fill="currentColor"/><path class="mute-line" d="M3 3l18 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span>';$('bgmToggle').innerHTML=icon;$('bgmToggle').setAttribute('aria-pressed',info.enabled);$('bgmToggle').setAttribute('aria-label',info.enabled?'關閉背景音樂':'開啟背景音樂');
   $('supportMute').innerHTML=icon+(info.enabled?' 靜音':' 開啟聲音');$('supportMute').setAttribute('aria-pressed',!info.enabled);$('bgmVolume').value=Math.round(info.volume*100);
 $('bgmName').parentElement.dataset.mode=info.mode;
  const mute=$('dialogMusicToggle');if(mute){mute.textContent=info.enabled?'關閉背景音樂':'開啟背景音樂';mute.setAttribute('aria-pressed',info.enabled);}
