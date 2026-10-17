@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const refs=[...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(m=>m[1]).filter(p=>!p.startsWith('#')&&!p.startsWith('http'));
+const css=['style.css','menu.css'].map(p=>fs.readFileSync(path.join(root,'css',p),'utf8')).join('\n');
+for(const m of css.matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g))refs.push(path.join('css',m[1]));
+const manifest=JSON.parse(fs.readFileSync(path.join(root,'assets/audio/manifest.json'),'utf8'));
+for(const t of Object.values(manifest))refs.push(t.src);
+for(const p of refs)if(!fs.statSync(path.join(root,p)).isFile())throw Error('Missing asset '+p);
+if(/https?:\/\//.test(css)||/<script[^>]+src="https?:/.test(html))throw Error('Unexpected runtime external dependency');
+console.log(`${refs.length} local asset references valid; no external script, font or style dependency.`);

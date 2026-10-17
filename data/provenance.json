@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-16T16:35:56.779Z",
+  "start": "2020-01-02",
+  "end": "2026-10-16",
+  "target": "2026-10-16",
+  "sources": [
+    {
+      "dataset": "TaiwanStockPrice",
+      "id": "0050",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=0050&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 1708
+    },
+    {
+      "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+      "id": "0050",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=0050&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 8540
+    },
+    {
+      "dataset": "TaiwanStockDividend",
+      "id": "0050",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDividend&data_id=0050&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 14
+    },
+    {
+      "dataset": "TaiwanStockPrice",
+      "id": "2330",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=2330&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 1713
+    },
+    {
+      "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+      "id": "2330",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=2330&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 8565
+    },
+    {
+      "dataset": "TaiwanStockDividend",
+      "id": "2330",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDividend&data_id=2330&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 28
+    },
+    {
+      "dataset": "TaiwanStockPrice",
+      "id": "2317",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=2317&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 1713
+    },
+    {
+      "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+      "id": "2317",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=2317&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 8560
+    },
+    {
+      "dataset": "TaiwanStockDividend",
+      "id": "2317",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDividend&data_id=2317&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 7
+    },
+    {
+      "dataset": "TaiwanStockPrice",
+      "id": "2454",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=2454&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 1713
+    },
+    {
+      "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+      "id": "2454",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=2454&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 8565
+    },
+    {
+      "dataset": "TaiwanStockDividend",
+      "id": "2454",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDividend&data_id=2454&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 10
+    },
+    {
+      "dataset": "TaiwanStockPrice",
+      "id": "TAIEX",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=TAIEX&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 1713
+    },
+    {
+      "dataset": "TaiwanStockTotalInstitutionalInvestors",
+      "id": "TAIEX",
+      "url": "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockTotalInstitutionalInvestors&data_id=TAIEX&start_date=2019-10-01&end_date=2026-10-16",
+      "records": 10278
+    }
+  ],
+  "notes": [
+    "原始成交價，不使用後見調整價。",
+    "0050 分割期間無可交易報價時以最近收盤估值；分割恢復交易日換股。",
+    "法人按遊戲規則延後一個交易日顯示。",
+    "大盤法人為金額（元），個股法人為股數。"
+  ]
+}

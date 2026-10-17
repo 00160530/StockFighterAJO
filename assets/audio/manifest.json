@@ -1,0 +1,30 @@
+{
+  "menu": {
+    "title": "韭菜盆栽的午後",
+    "mood": "輕鬆選單",
+    "bpm": 86,
+    "duration": 44.651,
+    "src": "assets/audio/menu.wav"
+  },
+  "walk": {
+    "title": "小韭今天也要上班",
+    "mood": "輕鬆行進",
+    "bpm": 108,
+    "duration": 35.556,
+    "src": "assets/audio/walk.wav"
+  },
+  "panic": {
+    "title": "綠到看不見未來",
+    "mood": "恐慌事件",
+    "bpm": 128,
+    "duration": 30.0,
+    "src": "assets/audio/panic.wav"
+  },
+  "fomo": {
+    "title": "怎麼又沒上車",
+    "mood": "FOMO 事件",
+    "bpm": 136,
+    "duration": 28.235,
+    "src": "assets/audio/fomo.wav"
+  }
+}
