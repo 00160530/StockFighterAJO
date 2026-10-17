@@ -67,4 +67,9 @@ Use case: lighting-weather and precise palette edit. Edit target: supplied rente
 
 0.8.2：新增 assets/support-hand.svg，原創程式向量，食指橫向伸出、其餘手指握拳，以白色袖口及灰綠細節配合小韭。接觸點與 K 棒共用座標錨點；放大比例依當日開盤到最低價計算，讓 0050 窄幅 K 棒也能準確托在手指上。秘技切入條、速度線、衝擊與支撐碎片由 CSS／Canvas 繪製。
 
+## v0.8.3 Q 版裸手
+
+assets/support-hand-chibi.webp 取代演出使用的 SVG 手部。內建 imagegen 生成並編輯為 Q 版、裸手、無衣袖，保留透明 RGBA，僅轉換為無損 WebP。詳細素材資訊與兩階段提示詞見 [HAND_ASSET.md](HAND_ASSET.md)。
+
+
 

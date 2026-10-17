@@ -52,7 +52,7 @@
 
 ## 原創認真表情
 
-內建 imagegen 工具生成 assets/xiaojiu-serious.webp，1536 × 1024、透明 RGBA。參考既有原創小韭的角色設計，新增扶眼鏡、拿筆記的認真表情；只轉成 WebP 格式，未用程式重繪或套色。手指為 HTML 內原創 SVG，衝擊圈、聚光與 K 棒為 CSS/Canvas。
+內建 imagegen 工具生成 assets/xiaojiu-serious.webp，1536 × 1024、透明 RGBA。參考既有原創小韭的角色設計，新增扶眼鏡、拿筆記的認真表情；只轉成 WebP 格式，未用程式重繪或套色。0.8.3 手部改用 Q 版裸手 WebP，完整提示詞見 [HAND_ASSET.md](HAND_ASSET.md)；衝擊圈、聚光與 K 棒為 CSS/Canvas。
 
 最終提示詞：
 
