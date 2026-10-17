@@ -56,3 +56,31 @@ body.at-title{--title-dock-height:44px;height:auto;min-height:100dvh;overflow-x:
  .at-title .title-illustration:has(.home-poll) .title-bubble{right:0}
 }
 @media(max-width:760px){body.at-title{--title-dock-height:60px}.at-title .music-dock{gap:8px;padding-left:12px;padding-right:12px}.at-title .bgm-copy{min-width:0}.at-title .title-footer{height:auto}.at-title .title-screen{padding-bottom:16px}}
+/* The halo belongs to the actor, never to the room or an unrelated coordinate. */
+.at-title .title-actor{position:relative;isolation:isolate;aspect-ratio:1;width:min(78%,37vh,380px);min-width:0;animation:idleBob 4s ease-in-out infinite}
+.at-title .title-actor .title-halo{position:absolute;inset:auto;left:50%;top:50%;width:116%;height:116%;max-width:none;transform:translate(-50%,-50%);background:none;box-shadow:none;border-radius:0;z-index:-1;pointer-events:none}
+.at-title .title-actor #titleCharacter{position:relative;inset:auto;display:block;width:100%;max-width:none;height:auto;aspect-ratio:1;animation:none;transform:none}
+.at-title .title-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;gap:14px;min-width:0;max-width:100%;width:100%;padding:8px 0 0;isolation:isolate}
+.at-title .title-stage .title-actor{grid-row:2}
+.at-title .title-stage #titleBubble{position:relative;inset:auto;grid-row:1;justify-self:end;width:fit-content;max-width:calc(100% - 16px);min-height:0;margin:0 8px;transform:none;white-space:normal;overflow-wrap:anywhere;text-align:left;line-height:1.65;animation:homeBubbleFloat 4s ease-in-out infinite}
+@media(min-width:761px){
+ .at-title .title-screen{grid-template-columns:minmax(0,1fr);width:100%;max-width:100%;min-width:0}
+ .at-title .title-layout{min-width:0;max-width:1200px}
+ .at-title .title-illustration{position:relative;inset:auto;display:flex;flex-direction:column;align-items:center;gap:14px;min-width:0;width:100%;max-width:100%;height:auto;min-height:0;max-height:none;align-self:center;padding:4px 0}
+ .at-title .title-illustration .title-stage{order:1}
+ #titleScreen .title-illustration .title-note{position:relative;inset:auto;order:2;display:block;max-width:100%;width:100%;margin:0;text-align:center;white-space:normal;overflow-wrap:anywhere;font-size:10px;line-height:1.8}
+ .at-title .title-illustration .home-poll{position:relative;inset:auto;order:3;align-self:center;width:min(100%,300px);max-width:100%;min-width:0;margin:0;box-sizing:border-box}
+ .at-title .title-illustration .floating-note{display:none}
+ .at-title .title-stage #titleBubble{max-width:min(260px,calc(100% - 16px));padding:11px 15px;font-size:12px}
+ .at-title .home-poll>header{flex-wrap:wrap;gap:5px 10px}
+}
+@media(max-width:760px){
+ .at-title .title-illustration{right:8px;width:min(42vw,210px)}
+ .at-title .title-stage{padding:0;gap:0}
+ .at-title .title-stage .title-actor{grid-row:1;width:100%;animation:idleBob 4s ease-in-out infinite}
+ .at-title .title-actor .title-halo{width:110%;height:110%}
+ .at-title .title-stage #titleBubble{display:none}
+ .at-title .title-copy .home-poll{max-width:100%;min-width:0;overflow-wrap:anywhere}
+}
+@keyframes homeBubbleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media(prefers-reduced-motion:reduce){.at-title .title-actor,.at-title .title-stage #titleBubble{animation:none}}
