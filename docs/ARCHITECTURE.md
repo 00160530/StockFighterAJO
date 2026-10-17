@@ -1,3 +1,7 @@
+> 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
+>
+> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+
 # 架構與資料約定
 
 零框架、零執行期依賴，使用一般 `defer` scripts，保留直接雙擊 HTML 的使用方式。瀏覽器不需 fetch 本機 JSON，避免 `file://` 跨來源讀取限制。
@@ -69,3 +73,7 @@ JSON 匯入限制 8 MB，驗證格式、資料範圍與帳戶欄位後才替換�
 ## v0.5 人生／自由模式更新
 
 已加入事件推進、三個交易日操作期、人生勝利解鎖自由模式、新聞來源簿與原創群聊。現行模式與事件規則以 [MODES_AND_EVENTS.md](MODES_AND_EVENTS.md) 為準；上文逐日流程仍作底層撮合規則，人生模式會自動執行沒有事件的日期。
+
+## v0.6 呈現層
+
+js/playback.js 的 Runner 在每個引擎 next 後先 paint，再等待可調間隔。stop 會立即喚醒計時器，不多算一天；每一幀儲存本機進度。序章資料新增 cg、alt、title、cue、stamp、next，各頁切換整張插畫。TaiguRecords.inventory 以當下 holdings 為真實部位，log 重建持倉週期買進日期，沿用 market.latest 的已知價格，分割仍由引擎處理。

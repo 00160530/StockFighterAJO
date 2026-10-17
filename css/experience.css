@@ -1,0 +1,36 @@
+/* Story images are full scenes, not a room with an interchangeable sprite. */
+.cg-dialog{padding:0;max-width:1160px;width:94vw;max-height:92dvh;border:1px solid #d7e2da;background:#fff;overflow:auto}
+.cg-dialog[open]{display:grid;grid-template-columns:minmax(0,2fr) minmax(290px,.9fr)}
+.cg-dialog .intro-art{height:auto;aspect-ratio:3/2;background:#edf1ee;align-self:center;overflow:hidden}
+.cg-dialog .intro-art>img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;animation:cgReveal .35s ease-out}
+.cg-dialog .intro-content{padding:28px 26px;display:flex;flex-direction:column;min-width:0;background:#fff}
+.cg-dialog .intro-meta{display:flex;justify-content:space-between;align-items:start;gap:8px;font-size:10px;color:#6b7e71;margin-bottom:32px;line-height:1.8}
+.cg-dialog .intro-meta button{font-size:10px;white-space:nowrap;padding:0}
+.cg-dialog .story-badge{font-size:10px;align-self:flex-start;margin:0 0 14px;line-height:1.7}
+.cg-dialog h2{font-size:clamp(23px,2.4vw,32px);line-height:1.5;color:#294d37;letter-spacing:.5px;margin:0 0 22px;font-weight:800}
+.cg-dialog .intro-content h3{font-size:12px;margin:0 0 9px;color:#718377}
+.cg-dialog .intro-content p{font-size:14px;line-height:1.95;min-height:0;color:#455d4e;margin:0 0 24px}
+.cg-dialog .intro-actions{display:flex;flex-direction:column;gap:14px;margin:auto 0 0;align-items:stretch}
+.cg-dialog .intro-actions>button{padding:13px 10px;font-size:13px;border-radius:6px}
+.intro-navigation{display:flex;align-items:center;justify-content:space-between;color:#6d8173;font:12px ui-monospace,monospace}
+.intro-navigation button{border:1px solid #dae4dd;border-radius:5px;padding:4px 11px;font-size:16px}
+.intro-stamp{position:absolute;left:15px;top:15px;background:#ffffffed;border:1px solid #d7e1da;border-radius:5px;padding:7px 11px;color:#355d43;font:700 14px ui-monospace,monospace;box-shadow:0 2px 7px #203c2710}
+.intro-cue{position:absolute;bottom:0;left:0;right:0;background:#ffffffed;border-top:1px solid #dce5df;padding:13px 15px;color:#334f3d;font-size:16px;font-weight:750;text-align:center}
+#introImageStatus{position:absolute;inset:42% 15%;padding:15px;background:#fff;border-radius:7px;text-align:center;color:#526d5c}
+.cg-dialog[data-scene=truck] .intro-stamp{color:#a44c63;border-color:#e6c7ce}.cg-dialog[data-scene=rewind] .intro-stamp{font-size:22px}
+@keyframes cgReveal{from{opacity:.4}to{opacity:1}}
+/* Total assets is a visible entry to an app-style inventory statement. */
+.asset-open{display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;padding:0}
+.asset-open>span{font-size:11px;color:#73877a;white-space:nowrap}.asset-open>span em{font-style:normal;font-size:9px;color:#416b50;margin-left:8px;border-bottom:1px solid #c4d5c9}
+.asset-open>strong{font-size:24px;font-family:ui-monospace,Consolas,monospace;font-weight:550;letter-spacing:.1px}.asset-open>small{font-size:10px}
+.inventory-date{font-size:12px;color:#718478;margin-bottom:15px}.inventory-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.utility-dialog:has(.inventory-summary){max-width:1080px;width:94vw}
+.inventory-summary article{padding:14px 12px;border:1px solid #dae5dd;border-radius:8px;background:#fff;min-width:0}.inventory-summary span{display:block;font-size:11px;color:#718477}.inventory-summary strong{display:block;font:700 20px ui-monospace,monospace;color:#345c43;margin-top:8px}.inventory-summary small{font-size:11px}.inventory-receivable{font-size:12px;color:#688071;margin:13px 0!important}
+.inventory-table-wrap{overflow:auto;max-width:100%;border:1px solid #dce5df;border-radius:7px;background:#fff}.inventory-table{border-collapse:collapse;width:100%;min-width:850px;font-size:12px}.inventory-table th{font-size:11px;background:#f0f5f1;color:#67806d;text-align:right;padding:12px 10px;white-space:nowrap}.inventory-table td{text-align:right;padding:13px 10px;border-top:1px solid #e6ece8;white-space:nowrap;font-family:ui-monospace,monospace}.inventory-table th:first-child,.inventory-table td:first-child{text-align:left}.inventory-table td small{display:block;font-size:10px;color:#819084;margin-top:4px}.inventory-trades{border:1px solid #dce6df;border-radius:7px;margin:10px 0;padding:12px}.inventory-trades summary{cursor:pointer;font-size:12px;color:#416c50}.inventory-trades .inventory-table-wrap{margin-top:12px}
+.inventory-summary .up,.inventory-table .up{color:#b9506c}.inventory-summary .down,.inventory-table .down{color:#218b85}
+.board-modes{display:flex;gap:5px;padding:4px;background:#edf3ee;border-radius:8px;margin:17px 0 9px}.board-modes button{flex:1;padding:12px;border-radius:6px;color:#6b8172;font-size:14px;font-weight:700}.board-modes button.selected{background:#3f6b50;color:#fff;box-shadow:0 2px 5px #17372117}.board-edition{font-size:11px;color:#6c8173;margin:8px 0 14px!important}
+.playback-controls{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#657f6d}.playback-controls label{display:flex;align-items:center;gap:7px}.playback-controls select{padding:3px 5px;border:1px solid #c8d9cd;border-radius:4px;background:#fbfdfb;color:#426b50;font-size:10px}.playback-controls button{font-size:10px;padding:4px 10px;border:1px solid #bbd1c2;border-radius:4px;background:#fff;color:#3b654a}
+@media(min-width:1100px) and (min-height:620px){.right-column{grid-template-rows:auto minmax(70px,1fr) 141px}.asset-open>strong{font-size:18px}.asset-open>span{font-size:10px}.asset-open>small{font-size:9px}.advance-panel{gap:5px 8px}.advance-panel .playback-controls{min-height:22px}}
+@media(min-width:1100px) and (max-height:699px){.right-column{grid-template-rows:auto minmax(70px,1fr) 132px}.asset-open>strong{font-size:16px}.cg-dialog .intro-content{padding:21px}.cg-dialog .intro-meta{margin-bottom:16px}.cg-dialog h2{font-size:24px;margin-bottom:15px}.cg-dialog .intro-content p{font-size:13px;line-height:1.8}.intro-cue{font-size:14px;padding:10px}}
+@media(max-width:800px){.cg-dialog{width:94vw;max-height:94dvh}.cg-dialog[open]{grid-template-columns:1fr}.cg-dialog .intro-art{width:100%;max-height:45dvh;aspect-ratio:3/2}.cg-dialog .intro-content{padding:18px 20px}.cg-dialog .intro-meta{margin-bottom:13px}.cg-dialog h2{font-size:23px;margin-bottom:13px}.cg-dialog .intro-content p{font-size:13px;line-height:1.8;margin-bottom:18px}.cg-dialog .intro-actions{flex-direction:row;align-items:center;gap:20px}.intro-navigation{gap:17px}.cg-dialog .intro-actions>button{flex:1}.intro-cue{font-size:12px;padding:9px}.intro-stamp{font-size:12px;padding:5px 8px;top:10px;left:10px}.inventory-summary{grid-template-columns:repeat(2,1fr)}.inventory-summary strong{font-size:17px}.inventory-trades{padding:9px}}
+@media(prefers-reduced-motion:reduce){.cg-dialog .intro-art>img{animation:none}}
