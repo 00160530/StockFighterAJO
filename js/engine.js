@@ -39,10 +39,14 @@ function createMarket(data){
   let paid=0;a.receivables=a.receivables.filter(r=>{if(r.pay<=d){a.cash=money(a.cash+r.amount);paid+=r.amount;return false;}return true;});
   if(paid)cb?.('dividend',`股利入帳 ${money(paid).toLocaleString('zh-TW')} 元`);return paid;
  }
- function fresh(){return {version:VERSION,datasetEnd:data.end,day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
+ function fresh(mode='free'){if(!['life','free'].includes(mode))throw Error('未知遊戲模式');return {version:VERSION,mode,...(mode==='life'?{life:{until:-1,openedAt:-1,anchorId:null,windows:0}}:{}),datasetEnd:data.end,day:-1,...account(),benchmark:account(),orders:[],log:[],seen:[],activeEvent:null,stress:24,spent:0,history:[{date:'2019-12-31',player:INITIAL,benchmark:INITIAL}],status:'playing',opening:true};}
+ const canTrade=s=>s.status==='playing'&&!s.opening&&!s.activeEvent&&(s.mode!=='life'||(s.day>=0&&s.day<=s.life.until));
+ function openWindow(s,id){if(s.mode!=='life')return;const until=Math.min(s.day+2,data.calendar.length-1);if(s.life.anchorId!==id)s.life.windows++;s.life={...s.life,openedAt:s.day,until:Math.max(s.life.until,until),anchorId:id};}
+ function migrateLegacy(s){if(s.mode!==undefined)return s;s.mode='life';s.life={until:Math.min(s.day+2,data.calendar.length-1),openedAt:s.day,anchorId:'legacy-resume',windows:1,eligibleForUnlock:s.status==='playing'};return s;}
  function queue(s,id,side,qty,sizeMode='fixed'){
   if(s.status!=='playing')throw Error('本次冒險已結束');
   if(s.activeEvent)throw Error('請先完成眼前的劇情選擇');
+  if(s.mode==='life'&&!canTrade(s))throw Error('人生模式須在事件開放的三個交易日內下委託');
   if(s.day>=data.calendar.length-1)throw Error('已無下一個交易日');
   if(!data.instruments[id]?.tradable)throw Error('大盤指數僅供觀察，不能直接買賣');
   if(!['buy','sell'].includes(side)||!Number.isSafeInteger(qty)||qty<1||qty>100000000)throw Error('請輸入正整數股數');
@@ -72,9 +76,12 @@ function createMarket(data){
  }
  function spend(s,amount){if(!Number.isFinite(amount)||amount<0||amount>s.cash)throw Error('現金不足，請先保留生活費');s.cash=money(s.cash-amount);s.spent=money(s.spent+amount);if(s.history.at(-1)?.date===date(s))s.history.at(-1).player=equity(s,date(s));finish(s);}
  function choose(s,event,choice){if(s.activeEvent!==event.id)throw Error('劇情狀態不符');if(!event.choices.includes(choice))throw Error('未知的劇情選項');if(choice.cost)spend(s,choice.cost);s.stress=Math.max(0,Math.min(100,s.stress+(choice.stress||0)));s.seen.push(event.id);s.activeEvent=null;record(s,'story',`${event.title}／${choice.label}${choice.cost?'（支出 '+choice.cost+' 元）':''}`);}
- function trigger(s,events){if(s.activeEvent||s.status!=='playing'||s.opening)return;const e=events.find(e=>e.date<=date(s)&&!s.seen.includes(e.id));if(e)s.activeEvent=e.id;}
+ function trigger(s,events){if(s.activeEvent||s.status!=='playing'||s.opening)return;const d=date(s);const e=events.find(e=>!s.seen.includes(e.id)&&(e.exact?e.date===d:e.date<=d)&&(!e.until||d<=e.until)&&(!e.when||e.when(s)));if(e){s.activeEvent=e.id;openWindow(s,e.id);}}
  function validate(raw){
   if(!raw||raw.version!==VERSION||raw.datasetEnd!==data.end)throw Error('存檔版本或資料範圍不相容');
+  if(raw.mode!==undefined&&!['life','free'].includes(raw.mode))throw Error('存檔模式不正確');
+  if(raw.mode==='life'){const l=raw.life;if(!l||!Number.isInteger(l.until)||!Number.isInteger(l.openedAt)||l.openedAt< -1||l.openedAt>raw.day||l.until< -1||l.until>=data.calendar.length||l.until>raw.day+2||!Number.isSafeInteger(l.windows)||l.windows<0||!(l.anchorId===null||typeof l.anchorId==='string'))throw Error('存檔操作期不正確');}
+  if(raw.chats!==undefined&&(!Array.isArray(raw.chats)||raw.chats.length>250||!raw.chats.every(c=>c&&typeof c.id==='string'&&typeof c.eventId==='string'&&typeof c.date==='string'&&c.date<=date(raw)&&typeof c.title==='string'&&Array.isArray(c.messages)&&c.messages.length<=12&&c.messages.every(m=>m&&typeof m.speaker==='string'&&typeof m.text==='string'&&m.text.length<=500)&&Array.isArray(c.replies)&&c.replies.length<=4&&c.replies.every(r=>typeof r==='string')&&(c.reply===null||c.replies.includes(c.reply)))))throw Error('存檔群組紀錄不正確');
   if(!Number.isInteger(raw.day)||raw.day< -1||raw.day>=data.calendar.length)throw Error('存檔日期不正確');
   if(!['playing','won','lost','bankrupt','awaiting-data'].includes(raw.status))throw Error('存檔狀態不正確');
   function checkAccount(a){if(!a||!Number.isFinite(a.cash)||a.cash<0||!a.holdings||typeof a.holdings!=='object'||Array.isArray(a.holdings)||!Array.isArray(a.receivables))throw Error('存檔資產不正確');
@@ -91,7 +98,7 @@ function createMarket(data){
  }
  function visibleRows(s,id){return data.instruments[id].rows.filter(r=>r[0]<=date(s));}
  function chipCutoff(s){return s.day<=0?'2019-12-31':data.calendar[s.day-1];}
- return {data,date,bar,latest,equity,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend};
+ return {data,date,bar,latest,equity,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend,canTrade,openWindow,migrateLegacy};
 }
 root.TaiguEngine={createMarket,fee,money,INITIAL,VERSION};
 })(globalThis);

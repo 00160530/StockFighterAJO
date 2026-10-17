@@ -99,3 +99,8 @@ node --test tests/engine.test.mjs
 ## 原創素材
 
 角色與背景使用內建 imagegen 工具生成，六種表情共用一張透明 sprite sheet，沒有複用參考圖的角色或背景。提示詞保存在 [docs/ASSETS.md](docs/ASSETS.md)。初版較寫實的插圖已移出交付內容。
+
+
+## v0.5 人生／自由模式更新
+
+已加入事件推進、三個交易日操作期、人生勝利解鎖自由模式、新聞來源簿與原創群聊。現行模式與事件規則以 [MODES_AND_EVENTS.md](docs/MODES_AND_EVENTS.md) 為準；上文逐日流程仍作底層撮合規則，人生模式會自動執行沒有事件的日期。
