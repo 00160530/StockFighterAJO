@@ -68,3 +68,7 @@ GitHub Actions 僅測試和發布前端，Worker 部署由 Wrangler 執行。bui
 0010 為 sf_polls 增加 red_label、green_label、deleted_at。紅色綁定 yes，預設行；綠色綁定 no，預設不行。管理新增／修改接口接受可選 redLabel、greenLabel，1–12 字，舊管理頁省略時保留現有文字。公開接口只回傳文字與票數，前端在文字及 aria 屬性中均轉義。
 
 `POST /admin/api/polls/:id/delete`（空 JSON）需要既有管理登入及同源驗證，以 batch 標記 deleted_at、關閉 active／visible 並寫入 delete-poll 稽核。兩種列表、投票及設定接口均排除已刪除題目，保留原始投票供查核；不提供公開刪除接口。
+
+## 0.14.1 合併排行榜讀取
+
+新增 GET /v1/boards，一個 SQL 排序查詢同時取得四榜及合法匿名身分的名次；未進前 100 名者仍能查看本人排名。舊端點維持相容，無資料表變更。前端依身分保留 5 分鐘快取，提交後失效。詳見 ../docs/LEADERBOARD-CACHE.md。

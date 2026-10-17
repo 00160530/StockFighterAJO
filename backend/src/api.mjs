@@ -19,6 +19,21 @@ const order='b.value DESC,b.drawdown_bps ASC,b.trades ASC,b.submitted_at ASC,b.r
 function publicRow(row){return {avatarCharacter:row.avatar_character==='xiaoxiaojiu'?'xiaoxiaojiu':'xiaojiu',avatarId:row.avatar_id||1,financing:row.financing===1?'margin':'cash',margin:JSON.parse(row.margin_summary||'{}'),rank:row.rank,runId:row.id,nickname:row.nickname,outcome:row.outcome,mode:row.mode,score:row.score,equityCents:row.equity_cents,benchmarkCents:row.benchmark_cents,drawdownBps:row.drawdown_bps,trades:row.trades,gainCents:row.gain_cents,lossCents:row.loss_cents,highlights:JSON.parse(row.highlights),submittedAt:row.submitted_at};}
 // Legacy financing editions remain intact; both are ranked together from source runs.
 function boardOutcome(url){const v=url.searchParams.get('outcome')||(url.searchParams.get('metric')==='loss'?'lost':'won');if(!['won','lost'].includes(v))fail(400,'INVALID_OUTCOME','請選擇贏過大盤或未贏大盤。');if(url.searchParams.has('financing'))finance(url.searchParams.get('financing'));return v;}
+// One snapshot query ranks all four boards and includes the caller even below 100.
+async function boardSnapshot(env,playerId=null){
+ const life=editionFor('life'),free=editionFor('free');
+ const tie="equity_cents DESC,CASE WHEN outcome='lost' THEN COALESCE(-loss_cents,0) ELSE COALESCE(gain_cents,0) END DESC,trades ASC,submitted_at ASC,id ASC";
+ const rows=await all(stmt(env,`WITH candidates AS (
+  SELECT r.*,ROW_NUMBER() OVER(PARTITION BY mode,outcome,player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
+  WHERE hidden=0 AND outcome IN ('won','lost') AND
+   ((mode='life' AND edition IN (?,?)) OR (mode='free' AND edition IN (?,?)))
+ ), ranked AS (
+  SELECT *,ROW_NUMBER() OVER(PARTITION BY mode,outcome ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1
+ ) SELECT * FROM ranked WHERE rank<=100 OR player_id=? ORDER BY mode,outcome,rank`,life,life+':margin-v1',free,free+':margin-v1',playerId));
+ const boards={life:{won:{items:[],entry:null},lost:{items:[],entry:null}},free:{won:{items:[],entry:null},lost:{items:[],entry:null}}};
+ for(const row of rows){const b=boards[row.mode][row.outcome],item=publicRow(row);if(row.rank<=100)b.items.push(item);if(playerId&&row.player_id===playerId)b.entry=item;}
+ return boards;
+}
 async function ranking(env,m,outcome='won',playerId=null){
  const edition=editionFor(m);if(!['won','lost'].includes(outcome))fail(400,'INVALID_OUTCOME','排行榜分類不正確。');
  const tie='equity_cents DESC,'+(outcome==='lost'?'COALESCE(-loss_cents,0)':'COALESCE(gain_cents,0)')+' DESC,trades ASC,submitted_at ASC,id ASC';
@@ -131,7 +146,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.14.0'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.14.1'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -139,6 +154,10 @@ export async function handle(request,env,ctx={},assets={}){
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null},200,cors);}
+  if(request.method==='GET'&&url.pathname==='/v1/boards'){
+   await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;
+   return json({edition:EDITION.id,boards:await boardSnapshot(env,p),verification:'basic',generatedAt:now},200,cors);
+  }
    if(request.method==='GET'&&url.pathname==='/v1/leaderboard'){
    await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({mode:m,outcome,edition:EDITION.id,items:await ranking(env,m,outcome),verification:'basic'},200,cors);
   }

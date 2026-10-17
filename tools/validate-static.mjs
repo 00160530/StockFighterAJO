@@ -11,6 +11,6 @@ const manifest=JSON.parse(fs.readFileSync(path.join(root,'assets/audio/manifest.
 for(const t of Object.values(manifest))refs.push(t.src);
 const story={window:{}};vm.createContext(story);vm.runInContext(fs.readFileSync(path.join(root,'js/story.js'),'utf8'),story);
 for(const p of story.window.TAIGU_STORY.opening)refs.push(p.cg);
-for(const p of refs)if(!fs.statSync(path.join(root,p)).isFile())throw Error('Missing asset '+p);
+for(const p of refs)if(!fs.statSync(path.join(root,p.split('?')[0])).isFile())throw Error('Missing asset '+p);
 if(/https?:\/\//.test(css)||/<script[^>]+src="https?:/.test(html))throw Error('Unexpected runtime external dependency');
 console.log(`${refs.length} local asset references valid; no external script, font or style dependency.`);
