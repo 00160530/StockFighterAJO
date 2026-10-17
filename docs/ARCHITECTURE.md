@@ -4,6 +4,10 @@
 
 # 架構與資料約定
 
+## 0.10.0 現行雲端邊界
+
+遊戲引擎、劇情、行情與完整存檔仍在前端。js/online.js 僅傳匿名 Session、玩家主動提交的結算摘要及回報。Cloudflare Worker 與 D1 保存排行榜、回報及管理稽核；不做遊戲同步或逐筆重算。管理後台由同一 Worker /admin 提供，帳密以加鹽雜湊儲存。舊版架構敘述若涉及 JSON 匯入／匯出或尚未串線排行，應以 README、LEADERBOARD、COMMUNITY 的現行說明為準。
+
 零框架、零執行期依賴，使用一般 `defer` scripts，保留直接雙擊 HTML 的使用方式。瀏覽器不需 fetch 本機 JSON，避免 `file://` 跨來源讀取限制。
 
 | 檔案 | 用途 |

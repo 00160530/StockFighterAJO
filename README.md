@@ -4,7 +4,14 @@
 
 # 台股戰士：小韭的第二次開盤
 
-可直接放上 GitHub Pages 的台股文字冒險原型。純 HTML、CSS、JavaScript，不需要帳號、付費主機、資料庫、API 金鑰或建置步驟。遊玩時所有資料均在本機瀏覽器處理。
+可直接放上 GitHub Pages 的台股文字冒險遊戲。遊戲與存檔使用純 HTML、CSS、JavaScript，在本機瀏覽器執行；線上排行榜及許願／問題回報透過 Cloudflare Worker 寫入 D1，玩家不需註冊帳號。完整存檔不會上傳。
+
+## 0.10.0 更新：線上排行榜與回報管理
+
+- 人生／自由模式獨立排行榜，提供超額報酬、最大獲利及翻車紀錄三榜，每榜前 100 名；每個匿名身分各榜只保留最佳一筆。完整結算後輸入暱稱提交，顯示目前名次。
+- 開局建立伺服器 Session，限制單次提交、有效時間、格式、數值一致性及頻率；沿用原遊戲計分。屬於基本規則檢核，無法完全驗證真實遊玩。
+- 許願池及問題回報已接通 D1。獨立管理後台可查看回報、標記狀態、寫管理筆記及下架異常成績。使用帳密登入，密碼只以加鹽雜湊儲存。
+- 管理後台：[小韭的服務台](https://stockfighterajo-leaderboard-api.yyy335522001.workers.dev/admin)。目前由管理員登入查看，尚未串接郵件通知。部署及維護見 [backend/README.md](backend/README.md)。
 
 ## 0.9.2 更新：日期更醒目
 
@@ -14,7 +21,7 @@
 ## 0.9.1 更新：遊戲資訊與公告
 
 - 首頁新增「關於」、「許願池及問題回報」、「更新公告」。首頁公告按鈕右側跑馬燈顯示最新一筆簡短公告；聚焦／滑鼠移入暫停，減少動態時改為靜態文字。
-- 許願和問題回報表單可保留本機草稿；送出功能準備中，尚未接收集平台或通知服務。公告維護及接線說明見 [COMMUNITY.md](docs/COMMUNITY.md)。
+- 此版最初提供許願和問題回報表單；現已於 0.10.0 接通雲端，且不保留草稿。公告維護及接線說明見 [COMMUNITY.md](docs/COMMUNITY.md)。
 - 存檔視窗移除重新轉生，完成一律回起始畫面；開始新的一輪請在首頁選擇模式。清除殘留的存檔匯出說明，保留操作紀錄 CSV。
 - 序章第 6 頁改為「本金 100 萬 → 2026 年 10 月∞萬」及指定宣言，只列三項遊戲目標。
 - 遊戲選單移除庫存、群組、排行榜、BGM 等重複入口；右下角改標示「BGM 設定」。遊玩數據結果以大字區塊呈現，教學改用不寫死標的名稱的說明，重看時不再顯示額外進度提示。
@@ -74,7 +81,7 @@
 - 本輪、上次／最佳遊玩數據和結局新增最大獲利、最大虧損、成交交易次數與已實現淨損益。高光依賣出淨收益金額比較，含買賣費用與交易稅，不混入股利或帳面浮盈。
 - 交易快捷增加「全部買進／全部賣出」；顯示的股數為估算，次日開盤依實際可用現金或持股計算，因此跳空上漲不會讓全部買進因估算股數太多整筆取消。多筆委託按提交順序撮合；不能買到一股仍會拒單。
 - 舊存檔的成交 log 可重建高光；已失去明細的舊結局摘要顯示資料不足，不捏造一筆交易。既有自動／手動存檔格式不變。
-- 首頁和選單新增本機排行榜預覽，僅比較同版本的完整輪次；跨玩家雲端排行榜尚未連線。欄位、規則與 Supabase／Cloudflare／Firebase 比較見 [docs/LEADERBOARD.md](docs/LEADERBOARD.md)。
+- 此版最初新增本機排行榜預覽，僅比較同版本的完整輪次；0.10.0 起另有跨玩家線上排行榜。欄位、規則與 Supabase／Cloudflare／Firebase 比較見 [docs/LEADERBOARD.md](docs/LEADERBOARD.md)。
 - 背景及 UI 改為白色、淺灰與少量低飽和綠色，去除主導的藍色與橘黃濾色。新背景為 `assets/room-sage.png`。
 
 ## 0.3 更新：電腦單畫面與中性日光美術
@@ -131,10 +138,10 @@
 
 1. 建立一個新的 GitHub repository，例如 `taigu-warrior`。使用 GitHub Free 時，請採公開 repository。
 2. 將**本資料夾裡的內容**放到 repository 根目錄；根目錄應直接看到 `index.html` 和 `package.json`。
-3. 最簡單的方式：到 **Settings → Pages → Build and deployment**，選 **Deploy from a branch**，分支 `main`、資料夾 `/(root)`，儲存。
+3. 到 **Settings → Pages → Build and deployment**，Source 選 **GitHub Actions**。附帶工作流程會測試並僅發布前端檔案，後端程式不會放入 Pages 網站。
 4. 等 GitHub 顯示網站網址，即可開啟遊戲。所有路徑都是相對路徑，支援 `/taigu-warrior/` 這種子路徑。
 
-也附了 `.github/workflows/pages.yml`。若想每次推送前自動跑測試，改在 Pages 的 Source 選 **GitHub Actions**，再推送 `main`；不需同時設定兩種部署方式。
+`.github/workflows/pages.yml` 會在推送 main 時執行前後端測試，以 `tools/build-pages.mjs` 產生前端發布目錄；沒有定時工作。
 
 本專案使用儲存庫 [00160530/StockFighterAJO](https://github.com/00160530/StockFighterAJO)。網站發布狀態與網址請以儲存庫 Settings → Pages 顯示為準。官方步驟：[建立 Pages 網站](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site)、[自訂部署工作流程](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
 
@@ -159,9 +166,9 @@ node --test tests/engine.test.mjs
 
 ## 測試
 
-執行 `node --test tests/*.test.mjs`，或 `npm test`。不需 npm install。目前共 73 項測試，涵蓋行情、次日成交與費稅、股利分割、基準、勝負與存檔、人生／自由模式、逐日播放、新聞與群聊、高光與庫存、教學、行情心情、法人賣壓選擇與資訊時序、橫向手指動畫與資料隔離、首頁台詞、BGM 與音效。
+執行 `node --test tests/*.test.mjs`，或 `npm test`。不需 npm install。前端目前共 77 項測試，涵蓋行情、次日成交與費稅、股利分割、基準、勝負與存檔、人生／自由模式、逐日播放、新聞與群聊、高光與庫存、教學、行情心情、法人賣壓選擇與資訊時序、橫向手指動畫與資料隔離、首頁台詞、BGM 與音效。
 
-這是單機原型，並未提供防改存檔、雲端同步或排行。靜態網站會隨包提供完整歷史；介面控制時間揭露，無法阻止玩家查看原始檔。不要在公開排行榜中把本機成績當作可驗證的競賽成績。
+後端另執行 `node --test backend/tests/*.test.mjs`，共 14 項測試。遊戲存檔仍只在本機；線上 API 僅接收排行摘要及玩家主動送出的回報。靜態網站提供完整歷史，玩家能查看或改寫前端，因此線上成績只標示基本規則檢核，並非完整防作弊驗證。
 
 ## 原創素材
 

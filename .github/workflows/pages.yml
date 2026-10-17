@@ -22,10 +22,12 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      - run: node --test backend/tests/*.test.mjs
+      - run: node tools/build-pages.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: work/pages
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
