@@ -223,6 +223,18 @@
 
 /* Keep the cropped illustration and text in one scroll area, with actions outside it. */
 .nickname-warning{display:block;color:#bd334e;font-size:12px;font-weight:650;line-height:1.6;margin-top:5px}
+.utility-dialog[data-view=run-history]{width:min(760px,94vw);max-height:94dvh}
+.history-mode-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.history-mode-tabs button{border:1px solid #bdd4c5;border-radius:6px;padding:7px 12px;background:#fff;color:#42694f}
+.history-mode-tabs button[aria-pressed=true]{background:#426f51;color:#fff}
+.history-count{font-size:11px;color:#738979}
+.run-history-list{display:grid;gap:10px;margin-top:10px}
+.run-history-entry{display:grid;width:100%;gap:5px;padding:13px 15px;border:1px solid #d2e3d7;border-radius:8px;background:#fff;text-align:left;line-height:1.6;color:#496d55}
+.history-entry-top,.history-entry-values{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.history-entry-top b{font-size:14px}.history-entry-top>span,.history-entry-date{font-size:12px}
+.history-entry-values strong{font:650 20px ui-monospace,monospace}.history-entry-values>span{font-size:12px}
+.run-history-entry small{font-size:10px;color:#7a8e80}
+@media(max-width:650px){.run-history-entry{padding:11px}.history-entry-values strong{font-size:18px}}
 .online-submit-form input[readonly]{background:#edf3ef;color:#466451;cursor:default}
 .utility-dialog[data-view=result]{height:min(820px,94dvh);max-height:94dvh;overflow:hidden}
 .utility-dialog[data-view=result][open]{display:flex;flex-direction:column}

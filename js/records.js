@@ -44,11 +44,16 @@ function validJourney(r){const iso=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/
 function validStats(r){return r.statsVersion===undefined||(r.statsVersion===1&&typeof r.statsComplete==='boolean'&&['buyTrades','sellTrades','wins','losses'].every(k=>Number.isSafeInteger(r[k])&&r[k]>=0)&&(r.realizedPnl===null||Number.isFinite(r.realizedPnl))&&['maxGain','maxLoss'].every(k=>r[k]===null||(r[k]&&typeof r[k].id==='string'&&typeof r[k].date==='string'&&['qty','price','costBasis','proceeds','pnl','returnPct'].every(f=>Number.isFinite(r[k][f])))));}
 function valid(r){return validJourney(r)&&!!r&&typeof r.id==='string'&&r.id.length<=120&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.at==='string'&&['playing','won','lost','bankrupt','awaiting-data'].includes(r.status)&&['current','completed','restarted'].includes(r.reason)&&['equity','benchmark','cash','returnPct','alpha','maxDrawdown','trades','fees','tax','spent','choices','sessions'].every(k=>Number.isFinite(r[k]))&&validStats(r)&&(r.playTimeMs===undefined||r.playTimeMs===null||Number.isSafeInteger(r.playTimeMs)&&r.playTimeMs>=0)&&(r.playTimePartial===undefined||typeof r.playTimePartial==='boolean')&&(r.skillUses===undefined||r.skillUses&&['mother','vip','divination'].every(k=>Number.isSafeInteger(r.skillUses[k])&&r.skillUses[k]>=0));}
 function normalize(value){return {version:1,runs:Array.isArray(value?.runs)?value.runs.filter(valid).slice(-100):[]};}
+function history(book,snapshots=[],mode='all'){
+ const runs=new Map(normalize(book).runs.map(r=>[r.id,r]));
+ for(const r of snapshots){if(!valid(r))continue;const old=runs.get(r.id),closed=x=>TERMINAL.includes(x.status);if(old&&Object.keys({...old,...r}).filter(k=>k!=='at').every(k=>JSON.stringify(old[k])===JSON.stringify(r[k])))continue;if(!old||closed(r)&&!closed(old)||closed(r)===closed(old)&&Date.parse(r.at)>=Date.parse(old.at))runs.set(r.id,r);}
+ return [...runs.values()].sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0)||a.id.localeCompare(b.id)).slice(0,100).filter(r=>mode==='all'||(r.mode||'free')===mode);
+}
 function best(book,mode=null){return book.runs.filter(r=>TERMINAL.includes(r.status)&&(!mode||(r.mode||'free')===mode)).slice().sort((a,b)=>b.alpha-a.alpha||b.equity-a.equity)[0]||null;}
 function upsert(book,run){if(!valid(run))throw Error('遊玩數據格式不正確');let runs=normalize(book).runs.filter(r=>r.id!==run.id);runs.push(run);const keep=[best({runs}),best({runs},'life'),best({runs},'free')].filter(Boolean);if(runs.length>100){runs=runs.slice(-97);for(const r of keep)if(!runs.some(x=>x.id===r.id))runs.unshift(r);}return {version:1,runs};}
 function leaderboard(book,outcome='won',edition=null){
  if(!['won','lost'].includes(outcome))throw Error('未知排行榜');
  return normalize(book).runs.filter(r=>r.status===outcome&&(!edition||(r.ruleset?.replace(/:margin-v1$/,'')===edition.ruleset.replace(/:margin-v1$/,'')&&r.datasetEnd===edition.datasetEnd))).slice().sort((a,b)=>b.equity-a.equity||(outcome==='lost'?(a.maxLoss?.pnl||0)-(b.maxLoss?.pnl||0):(b.maxGain?.pnl||0)-(a.maxGain?.pnl||0))||a.trades-b.trades||a.at.localeCompare(b.at)||a.id.localeCompare(b.id)).slice(0,100);
 }
-root.TaiguRecords={snapshot,normalize,best,upsert,valid,tradeStats,leaderboard,inventory};
+root.TaiguRecords={snapshot,normalize,best,upsert,valid,history,tradeStats,leaderboard,inventory};
 })(globalThis);
