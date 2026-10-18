@@ -69,3 +69,17 @@
  .chart-interaction-hint{display:none}
  .legend-hint #expandChart{font-size:9px;margin-left:0;padding:2px 4px}
 }
+
+/* Keep stress visible while the optional personality details are collapsed. */
+#gameShell .watchlist>.investor-personality{display:block;margin:0 12px;padding:9px 0;flex:0 0 auto}
+.investor-personality>summary{display:block;cursor:pointer;list-style:none;border-radius:4px;text-align:left}
+.investor-personality>summary::-webkit-details-marker{display:none}
+.investor-personality>summary:focus-visible{outline:2px solid #6e9980;outline-offset:3px}
+#gameShell .investor-personality .stress-label{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;line-height:1.5}
+#gameShell .investor-personality .stress-label b{margin-left:auto;font-size:10px;white-space:nowrap}
+.personality-chevron{font-size:16px;line-height:1;transition:transform .15s}
+.investor-personality[open] .personality-chevron{transform:rotate(180deg)}
+#gameShell .investor-personality .stress-track{display:block;height:5px;margin:6px 0 0}
+.personality-body{padding-top:12px;text-align:center}
+.personality-body>small{display:block;font-size:9px;line-height:1.6;color:#74887c}
+@media(max-width:650px){#gameShell .watchlist>.investor-personality{margin:0 10px;padding:8px 0}}

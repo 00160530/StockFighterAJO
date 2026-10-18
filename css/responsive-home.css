@@ -94,3 +94,24 @@ body.at-title{--title-dock-height:44px;height:auto;min-height:100dvh;overflow-x:
  .at-title .title-actions{margin-top:max(86px,calc(min(42vw,210px) - 78px))}
  .at-title .title-stage #titleBubble[data-speaking]{display:block;position:absolute;grid-row:auto;inset:auto;left:50%;bottom:calc(100% - 8px);translate:-50% 0;width:max-content;max-width:100%;margin:0;padding:9px 11px;font-size:12px;line-height:1.6;box-sizing:border-box;border-radius:12px 12px 2px 12px;z-index:2}
 }
+
+/* Keep the quote button beside the survey card, outside its header. */
+.home-community{display:grid;grid-template-columns:clamp(100px,10vw,140px) minmax(0,300px);align-items:center;justify-content:center;gap:12px;width:100%;min-width:0;pointer-events:auto}
+.at-title .title-illustration>.home-community{order:3}
+.stock-quotes-button{display:flex;flex-direction:column;align-items:center;justify-content:center;justify-self:center;gap:3px;min-width:0;width:100%;max-width:122px;padding:10px 8px;border:1px solid #d7c49b;border-radius:14px;background:linear-gradient(155deg,#fffdf5,#f7edcf);box-shadow:0 3px 0 #c9b88e,0 5px 12px #68532b12;cursor:pointer;pointer-events:auto;transition:transform .16s,box-shadow .16s}
+.stock-quotes-button:hover{transform:translateY(-1px);box-shadow:0 4px 0 #c9b88e,0 6px 14px #68532b20}
+.stock-quotes-button:active{transform:translateY(2px);box-shadow:0 1px 0 #c9b88e}
+.stock-quotes-button:focus-visible{outline:2px solid #b7883b;outline-offset:3px}
+.stock-quotes-art{display:block;width:54px;height:40px;overflow:visible;flex:none}
+.stock-quotes-wordmark{display:block;font-size:16px;line-height:1.35;font-weight:800;letter-spacing:1px;white-space:nowrap;color:#92602d}
+.at-title .home-community .home-poll{position:relative;inset:auto;width:100%;max-width:300px;margin:0;min-width:0}
+@media(max-width:760px){.title-copy>.home-community{grid-template-columns:96px minmax(0,1fr);gap:8px;margin:18px 0 5px}.stock-quotes-art{width:48px;height:35px}.stock-quotes-wordmark{font-size:15px;letter-spacing:.5px}.at-title .home-community .home-poll{max-width:none;padding:9px 10px}}
+@media(prefers-reduced-motion:reduce){.stock-quotes-button{transition:none}.stock-quotes-button:hover{transform:none}}
+
+/* Reserve footer width for the links; let only the announcement ticker shrink. */
+@media(min-width:761px){
+ .at-title .title-footer{display:grid;grid-template-columns:minmax(0,1fr) max-content;min-width:0;width:100%;max-width:1280px;gap:clamp(10px,1.4vw,18px)}
+ .at-title .title-footer>.announcement-bar{min-width:0;width:auto;max-width:100%;overflow:hidden}
+ .at-title .title-footer>.community-links{justify-self:end;justify-content:flex-end;flex-wrap:nowrap;min-width:0;max-width:100%;gap:clamp(8px,1vw,14px)}
+}
+@media(max-width:760px){.at-title .title-footer>.community-links{flex-wrap:wrap;justify-content:center;min-width:0;max-width:100%;gap:6px 14px}}

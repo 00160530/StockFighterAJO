@@ -1,3 +1,4 @@
+import {quoteList,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
 import {validateSharedRecord} from './shares.mjs';
@@ -114,7 +115,7 @@ async function admin(request,env,url,body,now,assets){
  if(request.method==='GET'&&url.pathname==='/admin/style.css')return adminResponse(assets.css,'text/css');
  if(request.method==='GET'&&url.pathname==='/admin/app.js')return adminResponse(assets.js,'text/javascript');
  if(request.method==='POST'&&url.pathname==='/admin/api/login'){const r=await adminLogin(request,env,body,now);return json({username:r.username},200,{'Set-Cookie':r.cookie});}
- const actor=await adminIdentity(request,env,now);const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
+ const actor=await adminIdentity(request,env,now);const quotesResponse=await quotesAdmin(request,env,url,body,now,actor);if(quotesResponse)return quotesResponse;const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
  if(request.method==='GET'&&url.pathname==='/admin/api/me')return json({username:actor});
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
  if(request.method==='GET'&&url.pathname==='/admin/api/announcement'){const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null});}
@@ -156,10 +157,11 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.14.1'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.4'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
+   if(request.method==='GET'&&url.pathname==='/v1/quotes'){await rate(env,'read:'+ip,120,60,now);return json(await quoteList(request,env,url.searchParams.get('tab')||'popular'),200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);return json({completions:await lifeCounts(env),poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
@@ -182,6 +184,8 @@ export async function handle(request,env,ctx={},assets={}){
    exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(!supportedEditions.includes(body.editionId))fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId),requestedEdition=editionFor(m,'cash',body.editionId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);
    const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+requestedEdition),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,requestedEdition,now,expiresAt,startDate).run();
    const saved=await stmt(env,'SELECT id,created_at,expires_at,start_date FROM sf_sessions WHERE player_id=? AND run_id=? AND edition=?',p,run,requestedEdition).first();if((saved.start_date||EDITION.start)!==startDate)fail(409,'SESSION_START_MISMATCH','這輪已使用另一個起始日期建立 Session。');response={sessionId:saved.id,sessionToken:token,createdAt:saved.created_at,expiresAt:saved.expires_at,mode:m,editionId:body.editionId};
+  }else if(url.pathname==='/v1/quotes'){response=await createQuote(request,env,body,now,ip);
+  }else if(/^\/v1\/quotes\/[a-zA-Z0-9_-]+\/like$/.test(url.pathname)){response=await likeQuote(request,env,url.pathname.split('/').at(-2),body,now,ip);
   }else if(/^\/v1\/polls\/[a-zA-Z0-9_-]+\/vote$/.test(url.pathname)){response=await vote(request,env,url.pathname.split('/').at(-2),body,now,ip);
    }else if(url.pathname==='/v1/completions'){
     const who=await player(request,env);uuid(body.sessionId);if(typeof body.sessionToken!=='string'||!/^[a-f0-9]{64}$/.test(body.sessionToken))fail(401,'SESSION_INVALID','沒有有效的遊戲 Session。');const session=await stmt(env,'SELECT * FROM sf_sessions WHERE id=? AND player_id=? AND token_hash=?',body.sessionId,who,await hash(body.sessionToken)).first();if(!session||session.mode!=='life'||body.mode!=='life')fail(400,'INVALID_COMPLETION','只累計完整人生模式。');const prior=await stmt(env,'SELECT session_id FROM sf_life_completions WHERE session_id=?',session.id).first();if(prior)return json({counted:true,completions:await lifeCounts(env)},200,cors);if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','遊戲 Session 已到期。');await rate(env,'completion:'+who,20,3600,now);const r=validateScore(body,session,now);await stmt(env,'INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at) VALUES (?,?,?,?)',session.id,who,r.outcome,now).run();response={counted:true,completions:await lifeCounts(env)};
