@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const VERSION=1, INITIAL=1000000, MARGIN={loanRatio:.6,annualRate:.0625,minimum:130,restore:166};
+const VERSION=1, INITIAL=1000000, MAX_PENDING_ORDERS=100, MARGIN={loanRatio:.6,annualRate:.0625,minimum:130,restore:166};
 const money=n=>Math.round(n*100)/100;
 const fee=n=>Math.max(20,Math.round(n*.001425));
 function createMarket(data){
@@ -129,12 +129,13 @@ function createMarket(data){
   if(!['fixed','all'].includes(sizeMode))throw Error('委託數量模式不正確');
   if(!['cash','margin'].includes(financing)||financing==='margin'&&!s.margin?.enabled)throw Error('融資尚未解鎖或交易方式不正確');
   if(financing==='margin'&&side==='buy'&&s.margin.call)throw Error('請先解除追繳，再新增融資');
-  if(s.orders.some(o=>o.id===id))throw Error('同一標的已有委託，請先取消');
+  if(s.orders.length>=MAX_PENDING_ORDERS)throw Error('待成交委託最多 '+MAX_PENDING_ORDERS+' 筆，請先取消或等待成交');
   if(s.day>=0&&!beforeStart(s)&&!bar(id,date(s)))throw Error('本標的今日暫停交易');
   if(side==='sell'&&qty>available(s,id,financing))throw Error('可賣股數不足，請確認現股／融資');
-  const order={id,side,qty,submitted:date(s),...(financing==='margin'?{financing}:{}),...(sizeMode==='all'?{sizeMode}:{})};s.orders.push(order);record(s,'order',`${sizeMode==='all'?'全部':''}${side==='buy'?'買進':'賣出'}委託 ${id} ${sizeMode==='all'?'約 ':''}${qty.toLocaleString()} 股，次日開盤撮合`,order);return order;
+  let serial=s.log.length+1;while(s.orders.some(o=>o.orderId==='order-'+serial))serial++;
+  const order={orderId:'order-'+serial,id,side,qty,submitted:date(s),...(financing==='margin'?{financing}:{}),...(sizeMode==='all'?{sizeMode}:{})};s.orders.push(order);record(s,'order',`${sizeMode==='all'?'全部':''}${side==='buy'?'買進':'賣出'}委託 ${id} ${sizeMode==='all'?'約 ':''}${qty.toLocaleString()} 股，次日開盤撮合`,order);return order;
  }
- function cancel(s,id){const n=s.orders.length;s.orders=s.orders.filter(o=>o.id!==id);if(n!==s.orders.length)record(s,'cancel',`取消 ${id} 委託`);}
+ function cancel(s,key){const index=s.orders.findIndex(o=>o.orderId===key||o.id===key);if(index<0)return;const [order]=s.orders.splice(index,1);record(s,'cancel',`取消 ${order.id} ${order.side==='buy'?'買進':'賣出'} ${order.qty.toLocaleString()} 股委託`,order);}
  function finish(s){if(s.day===data.calendar.length-1||equity(s,date(s))<=0||s.cash<0){if((equity(s,date(s))<=0||s.cash<0)&&s.margin?.totalBorrowed>0&&!s.bankruptcyReason)s.bankruptcyReason='margin-debt';repaySkillLoans(s,true,true);}const v=equity(s,date(s)),b=equity(s.benchmark,date(s));if(v<=0||s.cash<0){if(s.margin?.totalBorrowed>0){liquidateMargin(s,true);s.bankruptcyReason??='margin-debt';s.margin.call=null;}s.orders=[];s.status='bankrupt';}else if(s.day===data.calendar.length-1)s.status=data.end<data.target?'awaiting-data':v>b?'won':'lost';}
  function next(s){
   if(s.status!=='playing')return false;if(s.activeEvent)throw Error('請先完成劇情選擇');if(marginNeedsAction(s))throw Error('請先處理今天的融資追繳通知');if(s.supportGames?.some(g=>g.choice==='pending'))throw Error('請先完成支撐線事件選擇');
@@ -149,7 +150,7 @@ function createMarket(data){
   for(const o of pending){const r=bar(o.id,d);if(!r){record(s,'rejected',`${o.id} 暫停交易，委託取消`,o);continue;}
    try{const qty=o.sizeMode==='all'?(o.side==='buy'?(o.financing==='margin'?marginAffordable(s.cash,r[1]):affordable(s.cash,r[1])):available(s,o.id,o.financing)):o.qty;
     if(qty<1)throw Error(o.side==='buy'?'現金不足以買進一股，委託未成交':'已無可賣持股，委託未成交');
-    const trade=o.financing==='margin'?marginFill(s,o.id,o.side,qty,r[1]):fill(s,o.id,o.side,qty,r[1]);record(s,'fill',`${o.side==='buy'?'買進':'賣出'} ${o.id} ${trade.qty.toLocaleString()} 股 @ ${r[1].toFixed(2)}`,{...trade,...(o.sizeMode==='all'?{sizeMode:'all'}:{})});}
+    const trade=o.financing==='margin'?marginFill(s,o.id,o.side,qty,r[1]):fill(s,o.id,o.side,qty,r[1]);record(s,'fill',`${o.side==='buy'?'買進':'賣出'} ${o.id} ${trade.qty.toLocaleString()} 股 @ ${r[1].toFixed(2)}`,{...trade,...(o.orderId?{orderId:o.orderId}:{}),...(o.sizeMode==='all'?{sizeMode:'all'}:{})});}
    catch(e){record(s,'rejected',`${o.id}：${e.message}`,o);}
   }
   if(s.customStartDate&&s.mode==='life'&&s.day===startIndex(s))openWindow(s,'custom-start');
@@ -161,7 +162,7 @@ function createMarket(data){
  function trigger(s,events){if(s.activeEvent||s.status!=='playing'||s.opening)return;const d=date(s);const e=events.find(e=>!s.seen.includes(e.id)&&(e.exact?e.date===d:e.date<=d)&&(!e.until||d<=e.until)&&(!e.when||e.when(s)));if(e){s.activeEvent=e.id;openWindow(s,e.id);}}
  function jumpDate(s,target,{lifeCompleted=false}={}){
   skillReady(s);const index=data.calendar.indexOf(target);if(s.mode==='life'&&!lifeCompleted)throw Error('人生模式須完成一輪後才能跳日期');if(skillInfo(s).calendarRemaining<1)throw Error('本輪日期跳躍次數已用完');if(index<=s.day||index<0)throw Error('請選擇目前日期之後的交易日');
-  const draft=JSON.parse(JSON.stringify(s)),from=date(s);draft.activeEvent=null;for(const g of draft.supportGames||[])if(g.choice==='pending'){g.choice='decline';g.finished=true;}for(const o of [...draft.orders])cancel(draft,o.id);
+  const draft=JSON.parse(JSON.stringify(s)),from=date(s);draft.activeEvent=null;for(const g of draft.supportGames||[])if(g.choice==='pending'){g.choice='decline';g.finished=true;}for(const o of [...draft.orders])cancel(draft,o.orderId||o.id);
   draft.skills.calendarUsed=(draft.skills.calendarUsed||0)+1;while(draft.status==='playing'&&draft.day<index){if(marginNeedsAction(draft))acknowledgeMargin(draft);if(!next(draft))throw Error('日期跳躍未完成');}
   (draft.dateJumps??=[]).push({from,to:date(draft)});record(draft,'skill-calendar','日期跳躍：'+from+' → '+date(draft),{from,to:date(draft),target});if(draft.mode==='life'&&draft.status==='playing')openWindow(draft,'jump-'+draft.skills.calendarUsed);
   for(const key of Object.keys(s))delete s[key];Object.assign(s,draft);return s;
@@ -172,7 +173,7 @@ function createMarket(data){
   // Work on a copy: an error must never leave a half-fast-forwarded save.
   const draft=JSON.parse(JSON.stringify(s));draft.earlySettlementDate=date(s);draft.activeEvent=null;
   for(const g of draft.supportGames||[])if(g.choice==='pending'){g.choice='decline';g.finished=true;}
-  for(const o of [...draft.orders])cancel(draft,o.id);
+  for(const o of [...draft.orders])cancel(draft,o.orderId||o.id);
   record(draft,'early-settlement','按下人生遙控器，從 '+draft.earlySettlementDate+' 快轉；未成交委託取消，略過劇情，持股依規則結算');
   while(draft.status==='playing'&&draft.day<data.calendar.length-1){if(marginNeedsAction(draft))acknowledgeMargin(draft);if(!next(draft))throw Error('無法繼續快轉');}
   for(const key of Object.keys(s))delete s[key];Object.assign(s,draft);return s;
@@ -208,7 +209,7 @@ function createMarket(data){
   if(raw.skills!==undefined){const k=raw.skills;if(!k||k.version!==1||!k.levels||!Object.entries({mother:5,vip:5,divination:3}).every(([id,max])=>Number.isInteger(k.levels[id])&&k.levels[id]>=0&&k.levels[id]<=max)||!['motherUsed','vipUsed','totalRepaid'].every(id=>Number.isFinite(k[id])&&k[id]>=0)||k.motherUsed>k.levels.mother*200000||k.vipUsed>k.levels.vip*200000||k.totalRepaid>k.motherUsed+k.vipUsed+.01||!Array.isArray(k.loans)||k.loans.length>5000||!k.loans.every(l=>l&&['mother','vip'].includes(l.kind)&&typeof l.date==='string'&&l.date<=date(raw)&&typeof l.due==='string'&&(l.kind==='vip'?l.due==='settlement':l.due===sixMonthsLater(l.date))&&Number.isFinite(l.principal)&&l.principal>0&&Number.isFinite(l.remaining)&&l.remaining>=0&&l.remaining<=l.principal)||!Array.isArray(k.forecasts)||k.forecasts.length>k.levels.divination||!k.forecasts.every(f=>f&&data.instruments[f.id]&&typeof f.date==='string'&&f.date<=date(raw)&&['days','up','down','flat','suspended'].every(id=>Number.isInteger(f[id])&&f[id]>=0)&&f.days>=1&&f.days<=10&&f.up+f.down+f.flat===f.days&&f.suspended<=f.flat))throw Error('存檔技能與借款紀錄不正確');const borrowed=money(k.loans.reduce((n,l)=>n+l.principal,0)),remaining=money(k.loans.reduce((n,l)=>n+l.remaining,0));if(Math.abs(borrowed-k.motherUsed-k.vipUsed)>.01||Math.abs(borrowed-remaining-k.totalRepaid)>.01)throw Error('存檔技能借還款不一致');}
   for(const key of ['log','orders','seen','history'])if(!Array.isArray(raw[key]))throw Error('存檔紀錄不正確');
   if(!raw.log.every(l=>l&&typeof l.date==='string'&&typeof l.type==='string'&&typeof l.text==='string')||!raw.seen.every(id=>typeof id==='string'))throw Error('存檔紀錄內容不正確');
-  if(raw.orders.length>4||!raw.orders.every(o=>data.instruments[o.id]?.tradable&&['buy','sell'].includes(o.side)&&Number.isSafeInteger(o.qty)&&o.qty>0&&o.qty<=100000000)||new Set(raw.orders.map(o=>o.id)).size!==raw.orders.length)throw Error('存檔委託不正確');
+  if(raw.orders.length>MAX_PENDING_ORDERS||!raw.orders.every(o=>o&&data.instruments[o.id]?.tradable&&['buy','sell'].includes(o.side)&&Number.isSafeInteger(o.qty)&&o.qty>0&&o.qty<=100000000&&(o.orderId===undefined||typeof o.orderId==='string'&&/^order-[1-9]\d{0,15}$/.test(o.orderId)))||new Set(raw.orders.map(o=>o.orderId||o.id)).size!==raw.orders.length)throw Error('存檔委託不正確');
   if(!raw.orders.every(o=>o.sizeMode===undefined||o.sizeMode==='all'))throw Error('存檔委託模式不正確');
   if(!raw.orders.every(o=>o.financing===undefined||o.financing==='margin'&&raw.margin?.enabled))throw Error('存檔融資委託不正確');
   if(!Number.isFinite(raw.stress)||raw.stress<0||raw.stress>100||!Number.isFinite(raw.spent)||raw.spent<0||typeof raw.opening!=='boolean'||!(raw.activeEvent===null||typeof raw.activeEvent==='string'))throw Error('存檔劇情不正確');
