@@ -94,3 +94,5 @@ GitHub Actions 只測試並發布前端，不會部署 Worker 或操作 D1。bui
 `GET /v1/quote-boards` 一次回傳三類金句的前 50 句和自己的資格、留言、按讚狀態。查詢用視窗函式先選出各榜上限，最多回傳 150 個不同候選給 Worker；公開結果不帶玩家 ID、token 或內部排名欄位。前端依匿名 token 暫存 5 分鐘，去重同時讀取，切換頁籤及短時間重開不再請求。留言、按讚、取消按讚成功或送出排行榜成績後使金句快取失效；讀取失敗可重試，舊請求不能覆蓋已失效後的新快取。不新增手動更新按鈕。
 
 管理查詢 `GET /admin/api/quotes` 增加 `q`（部分金句）、`nickname`（部分顯示暱稱）、`featured=all|yes|no`、`status=all|active|revoked`、`sort=latest|oldest|likes|likes_asc|nickname|updated`；支援同時套用條件及 `page`，回傳篩選後 `total`。部分查詢中的 `%`、`_`、反斜線以字面比對，所有值均綁定參數，排序採白名單。後台以表格呈現，註銷、恢復與精選操作保留當下查詢條件。
+
+管理員可透過 `POST /admin/api/quotes/:id/delete` 與 `{confirm:true}` 永久刪除測試金句。這個操作沿用登入、同源及操作標頭檢查，並以同一筆交易刪除該金句與所有按讚、寫入 `quote-delete` 稽核紀錄。只釋放這位玩家的金句名額，不刪除匿名身分、排行榜成績或通關紀錄；重新留言仍須符合原本資格。玩家重新整理遊戲後會取得更新狀態。註銷仍保留名額，適用不當留言管理。

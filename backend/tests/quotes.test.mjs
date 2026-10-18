@@ -123,3 +123,49 @@ test('author migration keeps existing quote text, status, likes and dates while 
  db.prepare('INSERT INTO sf_players(id,token_hash,created_at,nickname) VALUES (?,?,?,?)').run('old-author','hash',1,'原本股友');db.prepare('INSERT INTO sf_stock_quotes(id,player_id,body,hidden,featured,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run('old-quote','old-author','原本的金句',1,0,22,33);db.prepare('INSERT INTO sf_stock_quote_likes VALUES (?,?,?)').run('old-quote','old-author',23);
  db.exec(fs.readFileSync(new URL('0016_quote_authors.sql',dir),'utf8'));const r=db.prepare('SELECT * FROM sf_stock_quotes').get();assert.equal(r.body,'原本的金句');assert.equal(r.hidden,1);assert.equal(r.created_at,22);assert.equal(r.updated_at,33);assert.equal(r.nickname,'原本股友');assert.equal(r.avatar_id,1);assert.equal(r.avatar_character,'xiaojiu');assert.equal(db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes').get().n,1);db.close();
 });
+
+test('private self quote ID identifies only the authenticated author, including revoked quotes, without relying on text or nickname',async()=>{
+ const a=setup(),first=await a.who(),second=await a.who(),fan=await a.who();
+ for(const p of [first,second]){await a.complete(p);assert.equal((await a.call('/v1/quotes',{text:'一樣的金句'},p.playerToken)).status,200);}
+ const own=a.DB.db.prepare('SELECT id FROM sf_stock_quotes WHERE player_id=?').get(first.playerId).id;
+ for(const route of ['/v1/quotes','/v1/quote-boards']){
+  assert.equal((await a.call(route,null,first.playerToken)).data.self.quoteId,own);
+  assert.notEqual((await a.call(route,null,second.playerToken)).data.self.quoteId,own);
+  assert.equal((await a.call(route,null,fan.playerToken)).data.self.quoteId,undefined);
+  assert.equal((await a.call(route)).data.self.quoteId,undefined);
+ }
+ a.DB.db.prepare('UPDATE sf_stock_quotes SET hidden=1 WHERE id=?').run(own);
+ const snap=(await a.call('/v1/quote-boards',null,first.playerToken)).data;assert.equal(snap.self.quoteId,own);assert.equal(snap.self.hidden,true);assert.ok(!snap.tabs.latest.items.some(q=>q.id===own));
+});
+
+test('only an authenticated same-origin administrator can permanently delete a quote and its likes to release that player’s slot',async()=>{
+ const a=setup(),p=await a.who(),other=await a.who();a.DB.db.exec('PRAGMA foreign_keys=ON');
+ for(const who of [p,other])await a.complete(who);
+ const id=(await a.call('/v1/quotes',{text:'測試後可刪除'},p.playerToken)).data.id,kept=(await a.call('/v1/quotes',{text:'保留另一筆'},other.playerToken)).data.id,path='/admin/api/quotes/'+id+'/delete',admin=await a.admin();
+ await a.call('/v1/quotes/'+id+'/like',{liked:true},other.playerToken);
+ assert.equal((await a.call(path,{confirm:true},null,{source:base})).status,401);
+ assert.equal((await a.call(path,{confirm:true},null,{...admin,source:'https://evil.test'})).status,403);
+ assert.equal((await a.call(path,{confirm:true},null,{...admin,header:false})).status,403);
+ for(const body of [{},{confirm:false},{confirm:'true'},{confirm:true,playerId:other.playerId}])assert.equal((await a.call(path,body,null,admin)).status,400);
+ assert.equal((await a.call(path,{confirm:true},null,admin)).data.deleted,true);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quotes WHERE id=?').get(id).n,0);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes WHERE quote_id=?').get(id).n,0);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quotes WHERE id=?').get(kept).n,1);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_players WHERE id=?').get(p.playerId).n,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_runs WHERE player_id=?').get(p.playerId).n,1);
+ assert.equal(a.DB.db.prepare("SELECT COUNT(*) n FROM sf_admin_audit WHERE action='quote-delete' AND target_id=?").get(id).n,1);
+ const self=(await a.call('/v1/quote-boards',null,p.playerToken)).data.self;assert.equal(self.submitted,false);assert.equal(self.quoteId,undefined);assert.equal(self.eligible,true);
+ assert.equal((await a.call('/v1/quotes/'+id+'/like',{liked:true},other.playerToken)).status,404);
+ const next=await a.call('/v1/quotes',{text:'這次重新留言'},p.playerToken);assert.equal(next.status,200);assert.notEqual(next.data.id,id);
+ assert.equal((await a.call(path,{confirm:true},null,admin)).status,404);
+});
+
+test('deleting a revoked quote releases its slot, but never restores revoked leaderboard eligibility; audit failure rolls back deletion and likes',async()=>{
+ const a=setup(),p=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原本測試金句'},p.playerToken)).data.id,admin=await a.admin();
+ await a.call('/v1/quotes/'+id+'/like',{liked:true},p.playerToken);await a.call('/admin/api/quotes/'+id+'/hide',{note:'測試註銷'},null,admin);
+ a.DB.db.exec("CREATE TRIGGER reject_quote_delete_audit BEFORE INSERT ON sf_admin_audit WHEN NEW.action='quote-delete' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END");
+ const response=await handle(new Request(base+'/admin/api/quotes/'+id+'/delete',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','X-Admin-Action':'1',Cookie:admin.cookie},body:JSON.stringify({confirm:true})}),a.env);
+ assert.equal(response.status,500);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quotes WHERE id=?').get(id).n,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes WHERE quote_id=?').get(id).n,1);
+ a.DB.db.exec('DROP TRIGGER reject_quote_delete_audit');a.DB.errors.length=0;
+ a.DB.db.prepare('UPDATE sf_runs SET hidden=1 WHERE player_id=?').run(p.playerId);
+ assert.equal((await a.call('/admin/api/quotes/'+id+'/delete',{confirm:true},null,admin)).status,200);
+ const self=(await a.call('/v1/quote-boards',null,p.playerToken)).data.self;assert.equal(self.submitted,false);assert.equal(self.eligible,false);assert.equal((await a.call('/v1/quotes',{text:'不符資格'},p.playerToken)).status,403);
+});

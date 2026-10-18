@@ -49,3 +49,10 @@ test('only successful posting or liking invalidates cached quote lists; errors a
  let fail=true;const b=cachedClient({fetcher:async(url,options,snapshot)=>fail?Response.json({error:{code:'RETRY',message:'再試一次'}},{status:503}):Response.json(snapshot())});await assert.rejects(b.client.quotes());fail=false;await b.client.quotes();assert.equal(b.calls.length,2);
  let resolve;const c=cachedClient({fetcher:(url,options,snapshot)=>c.calls.length===1?new Promise(r=>resolve=()=>r(Response.json(snapshot()))):Promise.resolve(Response.json(snapshot()))});const old=c.client.quotes();c.client.invalidateQuotes();await c.client.quotes();resolve();await old;await c.client.quotes();assert.equal(c.calls.length,2);
 });
+
+test('only the authenticated player’s exact quote ID receives the own-row color and nickname marker',()=>{
+ const quote={id:'mine',body:'同一句金句',nickname:'同一暱稱',createdAt:1,likes:0},esc=String;
+ const mine=quoteHTML(quote,esc,{ownId:'mine'}),other=quoteHTML({...quote,id:'another'},esc,{ownId:'mine'}),anonymous=quoteHTML(quote,esc);
+ assert.ok(mine.includes('stock-quote-own'));assert.ok(mine.includes('同一暱稱 <span class="quote-you">(你)</span>'));
+ for(const html of [other,anonymous]){assert.ok(!html.includes('stock-quote-own'));assert.ok(!html.includes('quote-you'));}
+});

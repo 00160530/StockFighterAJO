@@ -32,3 +32,5 @@
 .quote-compose-actions button{padding:9px 16px;border:1px solid #bfd3c5;border-radius:7px;font-size:13px;color:#52735e;background:#fff}.quote-compose-actions button.primary{background:#416d52;color:#fff;border-color:#416d52}.quote-compose-actions button:disabled{opacity:.45;cursor:default}
 
 .quote-own-text{display:block;width:100%;resize:none;margin:6px 0;padding:10px;border:1px solid #bfd3c5;border-radius:7px;background:#fff;color:#31583e;font:inherit;line-height:1.7}
+
+#utilityContent .stock-quote.stock-quote-own{background:#e6f2ea;border-color:#8db49a;box-shadow:inset 3px 0 #527f61}.quote-you{white-space:nowrap;color:#416d52;font-weight:700}
