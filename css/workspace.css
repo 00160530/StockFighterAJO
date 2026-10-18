@@ -208,14 +208,14 @@
  #gameShell .center-column:has(#lastForecast:not([hidden])){grid-template-rows:minmax(0,1fr) max(230px,clamp(210px,30dvh,270px))}
 }
 
-/* Keep the full illustration and text in one scroll area, with actions outside it. */
+/* Keep the cropped illustration and text in one scroll area, with actions outside it. */
 .utility-dialog[data-view=early-confirm]{height:min(850px,94dvh)}
 .utility-dialog[data-view=early-confirm] #utilityContent{flex:1;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden;min-height:0}
 .utility-dialog[data-view=early-confirm] .journey-scroll{flex:1;min-height:0;display:grid;align-content:start;gap:12px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:16px 20px}
-.utility-dialog[data-view=early-confirm] .journey-scroll>.journey-cg{display:block;flex:none;width:100%;height:auto;max-height:none;aspect-ratio:3/2;object-fit:contain;object-position:center;border-radius:9px}
+.utility-dialog[data-view=early-confirm] .journey-scroll>.journey-cg{display:block;flex:none;width:100%;height:auto;max-height:none;aspect-ratio:auto;object-fit:contain;object-position:center;border-radius:9px}
 .utility-dialog[data-view=early-confirm] .journey-actions{flex:0 0 auto;margin:0;padding:12px 20px;border-top:1px solid #dbe7df;background:#fcfefd;gap:10px}
 .utility-dialog[data-view=early-processing] #utilityContent{overflow:auto}
-.utility-dialog[data-view=early-processing] .journey-cg{height:auto;max-height:none;aspect-ratio:3/2;object-fit:contain;object-position:center}
+.utility-dialog[data-view=early-processing] .journey-cg{height:auto;max-height:none;aspect-ratio:auto;object-fit:contain;object-position:center}
 @media(max-width:600px){
  .utility-dialog[data-view=early-confirm] .journey-scroll{padding:12px 14px}
  .utility-dialog[data-view=early-confirm] .journey-actions{padding:10px 14px;gap:8px}
