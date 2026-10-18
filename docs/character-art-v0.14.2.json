@@ -1,0 +1,259 @@
+{
+  "version": "0.14.2",
+  "date": "2026-10-18",
+  "artwork": "Approved white-shirt review v2",
+  "images": [
+    {
+      "character": "xiaojiu",
+      "asset": "assets/xiaojiu-expressions.png",
+      "source": "xiaojiu-expressions.png",
+      "sourceSha256": "c2838ba68b021b2317fec239df87d233b97932761a01c362bc7adbefbd785c0b",
+      "sha256": "c2838ba68b021b2317fec239df87d233b97932761a01c362bc7adbefbd785c0b",
+      "gitBlobSha": "5bfc32eacfb75e723002a6516ebf7fb1d62830ab",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 2002124,
+      "transparent": true
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/xiaojiu-serious.webp",
+      "source": "xiaojiu-serious.png",
+      "sourceSha256": "b8a5ccf90ecfc30058c156b3969eafa137284e353f6b4a13b9bd0a5afeca31c7",
+      "sha256": "a26372aa47c03228c2c7aed389cd4f8a4133ba023169d1c83d14fab5bde16ba4",
+      "gitBlobSha": "e7dd60ec026c536fe93dce8b0b2830fab68c6e35",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 790196,
+      "transparent": true
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/xiaojiu-moods-flat-1-10.webp",
+      "source": "xiaojiu-moods-flat-1-10.webp",
+      "sourceSha256": "bd26988cde2c25909604b1bd067f3cd61d4f3f2fe6c16d249269550b69fa402d",
+      "sha256": "bd26988cde2c25909604b1bd067f3cd61d4f3f2fe6c16d249269550b69fa402d",
+      "gitBlobSha": "45806e669dda1acab96ce6944b1f849d04842a7b",
+      "size": [
+        1983,
+        793
+      ],
+      "bytes": 277482,
+      "transparent": true
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-01.webp",
+      "source": "cg-01-white-v2.png",
+      "sourceSha256": "71a192c6b9b75652d3168a5ce5e481c5ee695d66aadb567757cbd8e70a0fd4d3",
+      "sha256": "06e74a96fd62b9265a3575690ad22110c4cabbd0669070e02009a4a56485307b",
+      "gitBlobSha": "05d49cbcf3712ba267e670d6914bf73a4995f811",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 229096,
+      "transparent": false
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-02.webp",
+      "source": "cg-02-white-v2.png",
+      "sourceSha256": "71de640f2ac2427ce56c5fd6d8ee55deef1fd5b5ca61fbcc98369c50d9cd93d9",
+      "sha256": "6acd730e46b0b1c0e2dc91a81890f74439cb8b01215e9428596238a29c2adaaa",
+      "gitBlobSha": "fefc77cbf1636168d6d4020042a79f1f94236513",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 290300,
+      "transparent": false
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-03.webp",
+      "source": "cg-03-white-v2.png",
+      "sourceSha256": "fd340c3b095fbffe9589fb09c8b90b9dc72768b85768aa961fb4c84daac4e966",
+      "sha256": "17cc410bcd4b6d4118436f1c3694db0d9c5dbf56363f6ead8c99bf1b6b7e7db2",
+      "gitBlobSha": "2b68818b2f53cc9e42e8966d13ac1407e2791503",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 285630,
+      "transparent": false
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-04.webp",
+      "source": "cg-04-white-v2.png",
+      "sourceSha256": "457769fd86cf168c1318c5297b4c92e1b9fa8c8beb0c4e2f5af3d89ca720db3b",
+      "sha256": "c2dded1bb6c8252a8d27e722c7e11c2aba5990d2982b50ae8944f3ee3d2f656a",
+      "gitBlobSha": "bbfc9adca500c4af501fda0f4230be9ec6164979",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 204758,
+      "transparent": false
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-05.webp",
+      "source": "cg-05-white-v2.png",
+      "sourceSha256": "7f4fbcbfb32adfb5360655284363a9a69463bc94925808a4bb18982e672f9129",
+      "sha256": "d6c83399b10d2554ceea3647b08522089f71ad332ea8592bce31515022e0473e",
+      "gitBlobSha": "7742c01ea818a2508924a6e8d1862ffe99b1a499",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 208002,
+      "transparent": false
+    },
+    {
+      "character": "xiaojiu",
+      "asset": "assets/intro/cg-06.webp",
+      "source": "cg-06-white-v2.png",
+      "sourceSha256": "4f912dd1dbf75e00c9fdcaf48eaa5315b9373c4c164861a3bd8c8c9c83e42f51",
+      "sha256": "99481fe106e94af9d3539d1e22508869f257d68ac8eae6d73670bab838b21445",
+      "gitBlobSha": "e49ba6e83c7cfc068f4bb97bd5f1a6b412fe0705",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 233232,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/expressions.webp",
+      "source": "exec-b6d20e97-ee30-4be3-8385-f00a0c606f90.png",
+      "sourceSha256": "227adfd269ad0ad672553a81181688b80e3ed2913f7578386bfc00369cd2639d",
+      "sha256": "e8c9444f3c96adfd43a1cc3e31acd398e7ec6b9acd3c60b6df3be01ded510c68",
+      "gitBlobSha": "f9cf43c094806a8a8b9c84f54b602d1fbca5e7a7",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 1420430,
+      "transparent": true
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/serious.webp",
+      "source": "exec-ae92aecc-476c-40fd-a18b-59a7a3a16b85.png",
+      "sourceSha256": "b8ea5d0d044d45598641b5cc17cb33160ce4a105c1cc305ec858f5437ae11e2a",
+      "sha256": "0fb1e38a541e601a173113bc09343ab8e220cc51f2868fa53d1a25213f4303ce",
+      "gitBlobSha": "ac34a49acb9fdddbec7fdc14a366c24738d6f1dd",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 780792,
+      "transparent": true
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/moods.webp",
+      "source": "exec-499e4e21-2437-4da5-83c8-ef2172191d36.png",
+      "sourceSha256": "f6776a1b657677a0ac2e17c39e76d068051012c63a484f2647bcb2fbd41b8c8f",
+      "sha256": "25df90ab12075b506ad423a1d92cd50171f8f4d62aff80ea18eb15e28173c353",
+      "gitBlobSha": "6b3a3cceee8fdb576385307a0e4984fa3a8a01a0",
+      "size": [
+        1983,
+        793
+      ],
+      "bytes": 1293908,
+      "transparent": true
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-01.webp",
+      "source": "exec-fd230651-7f40-4978-9b83-075bf07c0366.png",
+      "sourceSha256": "a30aca7301140973638c0adfe10d799d196ff9120b4727802cd088a552a98ab7",
+      "sha256": "4b1d45a8d024319ed8f8c3c3c60b740e955fa79dce7018e97ae3bdb7da3b7f60",
+      "gitBlobSha": "615d15be205ec309b9a308a18333b3ee01385b93",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 232828,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-02.webp",
+      "source": "exec-a13e6ea2-3669-4c5f-83b5-74419f0fa8d6.png",
+      "sourceSha256": "39c34dc062cf852cd9b1f648a85e13733dd6c69e9f7178203daba4ad8b3d9323",
+      "sha256": "6610f460c69e38074cb0486f015fbac8b1e43b2eff48945bd531d2d80163f090",
+      "gitBlobSha": "430bdcb1674b676e1fc102a23cd90d2c4edb105b",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 300342,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-03.webp",
+      "source": "exec-1e520968-4126-43bb-b4f4-f889c7f553c1.png",
+      "sourceSha256": "b59536fc4ecc74ff0d3ebb37bab657d7aa3d2ce19e92375164c2b718720acaf7",
+      "sha256": "b4a70bd036fd422f0ac11043617656521c67c3e150e051de4fcb3f176f5d10f2",
+      "gitBlobSha": "fda3d79b0cc90562acbe45477695dbcbdc28e145",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 276208,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-04.webp",
+      "source": "exec-734831d0-40d6-4dfd-825b-348a4e1b0382.png",
+      "sourceSha256": "4e2a0d68288b4c60820517260e3564121919bb2104d501390da406221d42d433",
+      "sha256": "9973793c7adcd213dcde1d3694c3a4a3791d097c01f8b218bd9aac4a436435e3",
+      "gitBlobSha": "ce6bea8e76e40af497e2ff2f5953e16789feceaa",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 208678,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-05.webp",
+      "source": "exec-ff28fed0-fd9f-4a43-9e3d-7c1a90f4728f.png",
+      "sourceSha256": "15a6d9c0b5c1f966eac602ce49efc2d91d73298d457a627968bbf8bf09c569eb",
+      "sha256": "3c6cd7be8c7446fef3f89bf24aad162c0aeaf768fdd7ab3e91de0d623b9b4f3d",
+      "gitBlobSha": "054574e4bae2bf66971c91d282c43a4e677c0557",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 215050,
+      "transparent": false
+    },
+    {
+      "character": "xiaoxiaojiu",
+      "asset": "assets/characters/xiaoxiaojiu/intro/cg-06.webp",
+      "source": "exec-3b62c874-d5ce-43c3-a7a9-ef58f9f783c4.png",
+      "sourceSha256": "9406a7ecdc8cf18cd2e36211e2c9e6c6da301deb32eae171b912cc5ba2b5b03d",
+      "sha256": "de48449bf33bc70e83cff58e2cf9e1e54478071b0ce971bceffb37f8226873ff",
+      "gitBlobSha": "95a2d0c61c94d6fdf325b6c35928c05e06c4ea57",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 246578,
+      "transparent": false
+    }
+  ]
+}

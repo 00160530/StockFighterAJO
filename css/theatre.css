@@ -1,4 +1,4 @@
-.character-sprite[data-face=serious]{background-image:url('../assets/xiaojiu-serious.webp');background-size:cover;background-position:center}
+.character-sprite[data-face=serious]{background-image:url('../assets/xiaojiu-serious.webp?v=0.14.2');background-size:cover;background-position:center}
 #titleCharacter{background-position:var(--sprite-x,0%) var(--sprite-y,0%);padding:0;background-color:transparent;border:0;pointer-events:auto;transition:none}#titleCharacter[data-face=serious]{background-position:center;background-size:cover}.title-bubble{pointer-events:none;max-width:260px;min-height:60px}.title-bubble:empty{display:none}
 .story-panel[data-reaction=smug] .story-body h3{color:#47764e}.story-panel[data-reaction=panic] .story-body h3{color:#b95070}.story-panel[data-reaction=serious] .story-body h3{color:#365d49}
 .story-panel[data-reaction] .speaker-row small{font-size:9px}.story-panel[data-reaction] .story-body{animation:reactionIn .22s ease-out}

@@ -1,74 +1,38 @@
 # 角色素材與選擇
 
-角色選單使用「小韭」「小小韭」兩個名字。角色是瀏覽器的外觀偏好，不改動劇情中的「小韭」稱呼、交易數值、技能或每輪成績。第一次進入人生模式會先選擇；首頁點擊人物可更換，滑過人物保留金句。
+角色選單只顯示「小韭」「小小韭」。外觀偏好不改動劇情中的小韭稱呼、交易數值、技能、存檔或成績。第一次進入人生模式先選擇；首頁點擊人物可更換，滑過人物保留金句。
 
-角色偏好存在 `taigu-warrior.v1.characters`，舊資料預設小韭且尚未確認選擇。清除全部本機紀錄會一併清除偏好。既有存檔不需遷移，重載網頁保留外觀。六張序章、一般與認真姿勢共用角色設定。
+角色偏好存在 taigu-warrior.v1.characters，舊資料預設小韭且尚未確認選擇。重載網頁保留外觀。一般表情、認真立繪、十種心情頭像及六張序章皆隨角色切換。
 
-## 完整圖片盤點
+## 0.14.2 確認設計
 
-| 原素材 | 內容／使用位置 | 小小韭版本 |
+- 男女主角襯衫均為中性白色，使用淺灰皺褶陰影，不使用米色或奶油色底。男主角序章 01–06 與女主角序章 04 採用最後確認的白襯衫 v2 圖片，包含幻想／平行分身。
+- 小小韭不戴帽子或眼鏡，前側髮束至鎖骨、後髮短；頸側或衣領的留白表現前長後短，不綁馬尾。
+- 女性化五官、柔和肩線、收腰及自然臀腿線條；修身九分褲保留褲中線與露踝，鞋子為棕色低跟橫帶樂福鞋。
+- 各類圖片依男主角原圖維持相對應的 Q 版程度；心情頭像使用粗描邊及簡化塗色。
+- 女主角認真立繪為右手握筆、左手托筆記本，男主角保留扶眼鏡姿勢。
+
+## 圖片盤點
+
+| 內容 | 小韭 | 小小韭 |
 | --- | --- | --- |
-| assets/xiaojiu-expressions.png | 六表情：平常、開心、驚嚇、哭哭、得意、疲倦；首頁、對話頭像、手指支撐線事件與演出 | assets/characters/xiaoxiaojiu/expressions.webp |
-| assets/xiaojiu-serious.webp | 扶眼鏡拿筆記；首頁及遊戲內認真反應 | assets/characters/xiaoxiaojiu/serious.webp |
-| assets/xiaojiu-moods-flat-1-10.webp | 十心情：微笑、興奮、得意、認真、緊張、驚訝、哭哭、疲憊、生氣、期待；成績提交及排行榜 | assets/characters/xiaoxiaojiu/moods.webp |
-| assets/intro/cg-01.webp | 辦公室疲倦看盤 | assets/characters/xiaoxiaojiu/intro/cg-01.webp |
-| assets/intro/cg-02.webp | AI 獲利，包含幻想泡泡內的小分身 | assets/characters/xiaoxiaojiu/intro/cg-02.webp |
-| assets/intro/cg-03.webp | 卡車事故，無血腥漫畫撞擊 | assets/characters/xiaoxiaojiu/intro/cg-03.webp |
-| assets/intro/cg-04.webp | 時間倒轉 | assets/characters/xiaoxiaojiu/intro/cg-04.webp |
-| assets/intro/cg-05.webp | 租屋處驚醒 | assets/characters/xiaoxiaojiu/intro/cg-05.webp |
-| assets/intro/cg-06.webp | 重新挑戰，包含右側平行人生分身 | assets/characters/xiaoxiaojiu/intro/cg-06.webp |
+| 六種全身表情 | assets/xiaojiu-expressions.png | assets/characters/xiaoxiaojiu/expressions.webp |
+| 認真立繪 | assets/xiaojiu-serious.webp | assets/characters/xiaoxiaojiu/serious.webp |
+| 十種心情頭像 | assets/xiaojiu-moods-flat-1-10.webp | assets/characters/xiaoxiaojiu/moods.webp |
+| 序章 01 · 辦公室 | assets/intro/cg-01.webp | assets/characters/xiaoxiaojiu/intro/cg-01.webp |
+| 序章 02 · 街頭與幻想分身 | assets/intro/cg-02.webp | assets/characters/xiaoxiaojiu/intro/cg-02.webp |
+| 序章 03 · 卡車 | assets/intro/cg-03.webp | assets/characters/xiaoxiaojiu/intro/cg-03.webp |
+| 序章 04 · 時間倒轉 | assets/intro/cg-04.webp | assets/characters/xiaoxiaojiu/intro/cg-04.webp |
+| 序章 05 · 驚醒 | assets/intro/cg-05.webp | assets/characters/xiaoxiaojiu/intro/cg-05.webp |
+| 序章 06 · 重新挑戰與灰色分身 | assets/intro/cg-06.webp | assets/characters/xiaoxiaojiu/intro/cg-06.webp |
 
-共 9 個含角色的原素材檔、9 個新版本。支撐線手部三個歷代素材只有裸手或通用袖口，可共用。room-simple.png、room-neutral.png、room-sage.png、xiaojiu-halo.svg、favicon.svg 均無角色，不需替換。work/pages 中同名素材為舊部署副本，不是另一套圖。
+## 檔案與載入
 
-## 形象
+採用內建 imagegen 產出的已確認原圖。PNG 直接複製，透明素材僅以 lossless WebP 編碼；序章僅轉為品質 94 的 WebP，不裁切、重排或程式調色。所有圖片保留原始尺寸，心情圖集為 1983 × 793，其餘為 1536 × 1024。
 
-小小韭使用棕色分層狼尾短髮與兩側較長髮束、灰綠眼睛、細緻上睫毛及柔和下顎，不戴帽子或眼鏡。白襯衫搭配小灰綠領結，高腰深灰修身長褲帶中線剪裁、棕色皮帶及樂福鞋、米色斜背包。保留韭菜髮夾。
-
-認真姿勢改為拿筆記本思考。所有六表情、十心情與六張序章均依核定造型重繪。
-
-## 美術製作與完整提示詞
-
-
-使用內建 image_gen。依使用者核定設計重做 9 組素材；WebP 只做格式編碼，保留尺寸及透明 alpha。
-
-## expressions.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. No text or labels. Create replacement expression SPRITE SHEET on genuine transparent background, landscape 1536x1024, EXACTLY 3 equal columns and 2 equal rows. EXACT six separate fullbody chibi sprites. Each cell 512x512 with 48px completely empty transparent margins inside EVERY CELL. Render all artwork ONLY within x48..464,560..976,1072..1488 and y48..464 or560..976. Six poses smaller to fit each cell including effects and shoes. Row1 neutral standing gentle smile; happy raised fists starry eyes; panic hands near cheeks sweat. Row2 kneeling crying tears; smug folded arms; tired slouch sigh. Keep the exact approved wolf-cut hairstyle, NO tied hair, NO ponytails or hair bows in ANY pose including crying. The long locks fall freely along BOTH cheeks, same feminine face as design. Same trousers/blouse/neck ribbon in all six. Do not fill the cell with character. Use 3-head-tall chibi proportions. No floor, no backdrop, no outer glow, no shadow. Clean sharp sprite silhouettes. Any background pixels must be fully transparent. Safe margins mandatory.
-
-## serious.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. No text or labels. Create ONE serious/thoughtful full-body chibi sprite, 1536x1024 landscape with real transparent background, centered, standing whole body from hair tip to both shoes visible with 50px clear margin. Same cute proportions as design. Hold an OPEN small dark notebook in left hand, right hand lightly touching chin or tucking side hair back at temple, determined studious expression, NO touching glasses because she wears NO GLASSES. Same feminine face and exact layered hair with TWO long free cheek locks. Clean cutout, no ground or backdrop, no aura. ONE beige crossbody bag only. Sprite should occupy central 55% width and 90% height.
-
-## moods.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. No text or labels. Create EXACTLY TEN numbered-in-order but UNLABELED expressive head-and-shoulders chibi mood avatars in a SPRITE ATLAS. Landscape aspect ratio 5:2, precisely FIVE EQUAL COLUMNS and TWO EQUAL ROWS. Each avatar fits ENTIRELY in its square cell with clear transparent margins on all sides, no artwork touching adjacent cells. Actual transparent background, no background glow, no shadows, no circles, no frames. Keep this new approved feminine face and exact loose layered wolf hairstyle in EVERY avatar, NO ponytails. Row1 left to right: 1 gentle hopeful smile,2 ecstatic arms up eyes closed,3 smug half-lidded folded arms,4 angry frown clenched hands,5 nervous sweat. Row2:6 surprised round open mouth,7 sobbing blue tears,8 bored cheek resting on hand,9 sulking pursed lips,10 delighted hands clasped sparkles. Distinct expressive sticker faces but same approved heroine, delicate upper eyelashes and feminine face in each. Blouse/sage ribbon visible. All TEN cleanly separated and equally sized.
-
-## intro/cg-01.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG01, full opaque landscape illustration 1536x1024. Image2 is ORIGINAL MALE scene composition reference (not old female asset). Preserve office background, daylight Taipei101 window, messy paperwork foreground, computer on left with falling red/green candlesticks, bento and coffee, message bubbles with avatar and rising arrow. Replace the male protagonist with approved heroine from image1 sitting at desk cheek resting on hand, holding phone in other hand, exhausted expression. Clearly new feminine face and free long side locks, NO glasses, shirt with narrow sage ribbon instead of necktie. Same camera and staging. No readable text, no watermark.
-
-## intro/cg-02.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG02 full opaque landscape 1536x1024. Image2 is ORIGINAL MALE COMPOSITION reference ONLY, not character identity. Preserve Taipei street crosswalk with green walking light on left, buildings and Taipei101 distant right, heroine celebrating stock rally while walking, holds phone rising red arrow in one hand raises other fist, sparkly ecstatic eyes, full body. Replace ALL male figures including the SMALL character inside upper-right fantasy thought bubble with approved new heroine. Bubble heroine reclines under beach umbrella with tropical drink, same layered brown hair, sage ribbon, charcoal trousers, NO glasses or sunglasses. MAIN heroine wears approved tailored slim trousers pressed creases, brown loafers, white blouse narrow green ribbon. ONE beige satchel. No skirt, no ponytail. Preserve story/camera. No text.
-
-## intro/cg-03.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG03 full opaque landscape 1536x1024. Image2 is ORIGINAL MALE scene composition only, not identity. Preserve comedic non-graphic truck accident scene, white delivery truck on left, urban Taipei crosswalk and red pedestrian light right, speedlines and white cartoon impact burst, phone flying to right with red upward stock arrow. Replace male with approved NEW HEROINE in same airborne surprised pose, both open hands, legs visible in tailored charcoal LONG TROUSERS with center creases and loafers. Shocked feminine face, layered brown wolf hair, long loose cheek locks, no glasses. EXACTLY ONE beige satchel flies from shoulder with ONE continuous strap, not two bags. No injuries, blood, gore, hat or skirt, no text. Same staging as original.
-
-## intro/cg-04.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG04 full opaque landscape 1536x1024. Image2 original scene layout ONLY. Preserve surreal time-rewind spiral with flying blank calendar pages, giant clock with backwards sage-green arrow upper right, faded delivery truck vanishing left, open doorway bedroom at right. Replace the central floating male with approved feminine heroine, surprised expression, loose layered brown hair two longer side locks, green eyes NO glasses, white blouse sage ribbon, charcoal fitted long trousers with center crease and brown loafers, one beige crossbody bag, arms reaching out, legs floating. Maintain soft sage/ivory palette, dynamic swirl, readable staging, no text.
-
-## intro/cg-05.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG05 opaque landscape 1536x1024. Image2 scene layout only. Preserve airy Taipei bedroom, window Taipei101 left center, desk laptop books and leek plant on left, bed sage duvet right. Approved NEW heroine sits up in bed with startled expression, holding smartphone toward viewer showing ONLY simple sage calendar icon without text or dates, other hand on duvet. Replace male with approved heroine feminine eyes, delicate face, layered wolf-bob plus loose collarbone locks, leek hairclip, NO glasses. White blouse and small sage ribbon, legs under blanket. Same composition and gentle morning light, no readable text.
-
-## intro/cg-06.webp
-
-Use case: stylized-concept. Identity reference image 1 is the APPROVED heroine 小小韭, preserve this exact female identity: chocolate brown layered wolf-bob, asymmetric long bangs, outward flicked short layers and two longer collarbone side locks, small sage leek hairclip, feminine almond sage-green eyes with fine upper lashes, softly tapered face and small chin. NO GLASSES, NO HAT, NO PONYTAIL. Ivory white collared blouse with rolled sleeves, small narrow sage green neck ribbon, high-waist charcoal slim Korean tailored ankle-length trousers with distinct pressed center creases and brown belt, brown loafers, ONE small beige crossbody satchel. No skirt or tights. Clean dark brown outlines and restrained cel shading, friendly cute chibi game illustration. SAME identity and outfit in every pose. Image 2 is an OLD asset solely for layout and expression reference: replace ALL old feminine character designs with the approved new heroine, do not inherit its glasses, ponytail, face or skirt. No text or labels. Asset: prologue CG06 opaque landscape 1536x1024. Image2 original male scene composition only. Preserve bedroom office desk, laptop left foreground with simple two rising green and purple lines, checklist notebook and tablet foreground, Taipei101 window, sage curtains and plants. Replace BOTH the main male AND grayscale parallel self on right with the SAME approved new feminine heroine identity from image1. Main heroine sits at desk confidently rolling sleeve/raising fist, sage narrow ribbon, blouse, layered brown free wolf hair, feminine sage eyes, NO glasses. Ghost parallel heroine right is desaturated gray, holds green book to chest, same feminine hair silhouette and charcoal TAILORED LONG TROUSERS, NO skirt/ponytail. Keep clear compositional separation, warm hopeful morning lighting, no labels or text.
-
-
+每張來源與正式素材的 SHA-256、Git blob SHA、尺寸及透明度記錄在 character-art-v0.14.2.json。來源原圖與完整提示詞另附於本次美術預覽下載包。男女主角的一般表情、認真立繪、心情頭像與六張序章都使用 v=0.14.2 圖片版本，包含預載與最初的 HTML 圖片。
 
 ## 排行榜相容性
 
 心情編號仍為 1～10，另以 avatarCharacter 保存頭像角色，避免其他玩家或歷史紀錄跟著目前使用者換外觀。API 僅接受已登錄的兩個角色，舊客戶端省略此欄時沿用小韭。0012_avatar_character.sql 只增加欄位，不刪除資料；這項維護記錄不放入遊戲公告。
+
