@@ -23,7 +23,29 @@ test('local API preview only permits HTTP loopback when the page itself is local
 });
 test('quote client uses the existing identity for writes and private list state but public reads do not create an identity',async()=>{
  const calls=[],store=new Map(),context={window:{},setTimeout,clearTimeout,AbortController};vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../js/online.js',import.meta.url),'utf8'),context);
- const online=new context.window.TaiguOnline.Client({config:{apiBase:'https://api.example.test'},storage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},fetcher:async(url,options)=>{calls.push({url,options});return Response.json(url.endsWith('/players')?{playerId:'test-player',playerToken:'a'.repeat(64)}:{});}});
+ const online=new context.window.TaiguOnline.Client({config:{apiBase:'https://api.example.test'},storage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},fetcher:async(url,options)=>{calls.push({url,options});return Response.json(url.endsWith('/players')?{playerId:'test-player',playerToken:'a'.repeat(64)}:url.endsWith('/quote-boards')?{tabs:{popular:{items:[]},latest:{items:[]},featured:{items:[]}},self:{}}:{});}});
  await online.quotes('featured');assert.equal(calls.length,1);assert.equal(calls[0].options.headers.Authorization,undefined);
  await online.createQuote('先活下來');await online.likeQuote('quote-123',true);await online.quotes('popular');assert.equal(calls.filter(x=>x.url.endsWith('/players')).length,1);assert.equal(calls.at(-1).options.headers.Authorization,'Bearer '+'a'.repeat(64));assert.deepEqual(JSON.parse(calls[2].options.body),{text:'先活下來'});assert.deepEqual(JSON.parse(calls[3].options.body),{liked:true});
+});
+
+test('comment cards place escaped nickname and timestamp before the quote and use the requested character and mood',()=>{
+ const esc=s=>String(s).replaceAll('<','&lt;').replaceAll('>','&gt;'),html=quoteHTML({id:'quote-123',body:'等機會',nickname:'<股友>',avatarId:7,avatarCharacter:'xiaoxiaojiu',createdAt:1000,likes:2},esc,{avatar:(id,character)=>'<span class="avatar">'+character+':'+id+'</span>',now:1000*1000+86400000});
+ assert.ok(html.includes('xiaoxiaojiu:7'));assert.ok(html.includes('&lt;股友&gt;'));assert.ok(html.includes('1 天前'));assert.ok(html.indexOf('quote-comment-head')<html.indexOf('quote-comment-body'));assert.ok(html.includes('datetime='));assert.ok(!html.includes('回覆'));assert.ok(!html.includes('分享'));
+});
+
+function cachedClient({fetcher}={}){
+ const context={window:{},setTimeout,clearTimeout,AbortController};vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../js/online.js',import.meta.url),'utf8'),context);
+ const store=new Map(),calls=[];let clock=1000;
+ const snapshot=()=>({tabs:Object.fromEntries(['popular','latest','featured'].map(tab=>[tab,{items:[{id:tab}]}])),self:{eligible:true}});
+ const client=new context.window.TaiguOnline.Client({config:{apiBase:'https://api.example.test'},storage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},now:()=>clock,fetcher:async(url,options)=>{calls.push({url,options});if(fetcher)return fetcher(url,options,snapshot);return Response.json(url.endsWith('/quote-boards')?snapshot():{});}});
+ const identity=token=>{const a=client.read();a.player={playerId:token,playerToken:token.repeat(64)};client.write(a);};return {client,calls,snapshot,identity,tick:()=>clock+=300001};
+}
+test('all quote tabs and reopening share one five-minute snapshot; identity changes never reuse private like state',async()=>{
+ const a=cachedClient();await Promise.all([a.client.quotes('popular'),a.client.quotes('latest'),a.client.quotes('featured')]);await a.client.quotes('latest');assert.equal(a.calls.length,1);
+ a.tick();await a.client.quotes('featured');assert.equal(a.calls.length,2);a.identity('a');await a.client.quotes('popular');assert.equal(a.calls.length,3);assert.equal(a.calls.at(-1).options.headers.Authorization,'Bearer '+'a'.repeat(64));
+});
+test('only successful posting or liking invalidates cached quote lists; errors are retryable and stale requests cannot overwrite a newer snapshot',async()=>{
+ const a=cachedClient();a.identity('a');await a.client.quotes();await a.client.likeQuote('quote-123',true);await a.client.quotes('latest');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,2);await a.client.createQuote('一句',{nickname:'股友',avatarId:8,avatarCharacter:'xiaoxiaojiu'});await a.client.quotes('featured');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,3);assert.equal(JSON.parse(a.calls.find(c=>c.url.endsWith('/quotes')).options.body).avatarId,8);
+ let fail=true;const b=cachedClient({fetcher:async(url,options,snapshot)=>fail?Response.json({error:{code:'RETRY',message:'再試一次'}},{status:503}):Response.json(snapshot())});await assert.rejects(b.client.quotes());fail=false;await b.client.quotes();assert.equal(b.calls.length,2);
+ let resolve;const c=cachedClient({fetcher:(url,options,snapshot)=>c.calls.length===1?new Promise(r=>resolve=()=>r(Response.json(snapshot()))):Promise.resolve(Response.json(snapshot()))});const old=c.client.quotes();c.client.invalidateQuotes();await c.client.quotes();resolve();await old;await c.client.quotes();assert.equal(c.calls.length,2);
 });

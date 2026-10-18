@@ -84,3 +84,13 @@ GitHub Actions 只測試並發布前端，不會部署 Worker 或操作 D1。bui
 匿名身分沿用既有瀏覽器保存方式，一個身分一句並不代表一個自然人一句；本功能不新增可跨瀏覽器辨識個人的追蹤方式。留言以純文字顯示，金句文字與可及性標籤均須轉義。
 
 本機開發可將 API 指向 HTTP loopback，但頁面本身也必須位於 loopback；公開網站仍只接受 HTTPS API。此例外不會改寫公開設定，Pages 建置的 HTTPS 驗證維持原樣。
+
+## 金句頭像、留言卡與快取
+
+`0016_quote_authors.sql` 為既有金句新增 `nickname`、`avatar_id`、`avatar_character`；舊金句回填原玩家暱稱（沒有則顯示匿名股友），預設小韭的微笑頭像，保留金句原文、時間、狀態及按讚。
+
+留言接受額外的 `nickname`（同排行榜 2–20 字規則）、`avatarId`（1–10）、`avatarCharacter`（`xiaojiu`／`xiaoxiaojiu`）。已有固定排行榜暱稱必須沿用；尚無排行榜暱稱時，金句暱稱只保存為這則留言的顯示資料，不會替玩家設定排行榜暱稱。舊版只送 `text` 的請求仍能使用預設頭像及原本的排行榜暱稱，或匿名股友。留言成功後不能透過重試改文字、暱稱或頭像。
+
+`GET /v1/quote-boards` 一次回傳三類金句的前 50 句和自己的資格、留言、按讚狀態。查詢用視窗函式先選出各榜上限，最多回傳 150 個不同候選給 Worker；公開結果不帶玩家 ID、token 或內部排名欄位。前端依匿名 token 暫存 5 分鐘，去重同時讀取，切換頁籤及短時間重開不再請求。留言、按讚、取消按讚成功或送出排行榜成績後使金句快取失效；讀取失敗可重試，舊請求不能覆蓋已失效後的新快取。不新增手動更新按鈕。
+
+管理查詢 `GET /admin/api/quotes` 增加 `q`（部分金句）、`nickname`（部分顯示暱稱）、`featured=all|yes|no`、`status=all|active|revoked`、`sort=latest|oldest|likes|likes_asc|nickname|updated`；支援同時套用條件及 `page`，回傳篩選後 `total`。部分查詢中的 `%`、`_`、反斜線以字面比對，所有值均綁定參數，排序採白名單。後台以表格呈現，註銷、恢復與精選操作保留當下查詢條件。

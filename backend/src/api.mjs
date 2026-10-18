@@ -1,4 +1,4 @@
-import {quoteList,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
+import {quoteList,quoteBoards,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
 import {validateSharedRecord} from './shares.mjs';
@@ -157,10 +157,11 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.4'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.5'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
+   if(request.method==='GET'&&url.pathname==='/v1/quote-boards'){await rate(env,'read:'+ip,120,60,now);return json(await quoteBoards(request,env),200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/quotes'){await rate(env,'read:'+ip,120,60,now);return json(await quoteList(request,env,url.searchParams.get('tab')||'popular'),200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);return json({completions:await lifeCounts(env),poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}

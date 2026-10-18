@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {handle,EDITION} from '../src/api.mjs';
 import {database} from './db.mjs';
 import {hash} from '../src/security.mjs';
+import fs from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
 const origin='https://player.github.io',base='https://api.example.test';
 function setup(){
  const DB=database(),env={DB,RATE_LIMIT_SECRET:'test-only-quotes',ALLOWED_ORIGINS:origin};
@@ -72,4 +74,38 @@ test('quote creation and likes retain existing origin, ban and rate protections'
  const a=setup(),p=await a.who();await a.complete(p);assert.equal((await a.call('/v1/quotes',{text:'一句'},p.playerToken,{source:'https://evil.test'})).status,403);
  const id=(await a.call('/v1/quotes',{text:'一句'},p.playerToken)).data.id;for(let i=0;i<9;i++)await a.call('/v1/quotes',{text:'一句'},p.playerToken);
  assert.equal((await a.call('/v1/quotes',{text:'一句'},p.playerToken)).status,429);a.DB.db.prepare('UPDATE sf_players SET banned=1 WHERE id=?').run(p.playerId);assert.equal((await a.call('/v1/quotes')).data.items.length,0);assert.equal((await a.call('/v1/quotes',null,p.playerToken)).status,401);const fan=await a.who();assert.equal((await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken)).status,404);
+});
+
+test('quote authors support both characters and ten moods, preserve immutable author fields and reuse a locked leaderboard name',async()=>{
+ const a=setup(),p=await a.who();await a.complete(p);
+ for(const change of [{nickname:'A'},{nickname:'<script>'},{avatarId:0},{avatarId:11},{avatarId:1.5},{avatarCharacter:'fake'},{avatarCharacter:null}])assert.equal((await a.call('/v1/quotes',{text:'安全金句',nickname:'金句股友',avatarId:10,avatarCharacter:'xiaoxiaojiu',...change},p.playerToken)).status,400);
+ const body={text:'安全金句',nickname:'金句股友',avatarId:10,avatarCharacter:'xiaoxiaojiu'};assert.equal((await a.call('/v1/quotes',body,p.playerToken)).status,200);const row=(await a.call('/v1/quotes')).data.items[0];assert.equal(row.nickname,body.nickname);assert.equal(row.avatarId,10);assert.equal(row.avatarCharacter,'xiaoxiaojiu');assert.ok(row.createdAt>0);
+ assert.equal((await a.call('/v1/quotes',{...body,avatarId:1},p.playerToken)).status,409);assert.equal((await a.call('/v1/quotes',body,p.playerToken)).status,200);
+ const locked=await a.who();await a.complete(locked,{outcome:'won'});a.DB.db.prepare('UPDATE sf_players SET nickname=? WHERE id=?').run('排行榜股友',locked.playerId);
+ assert.equal((await a.call('/v1/quotes',{text:'另一句',nickname:'改個名字'},locked.playerToken)).data.error.code,'NICKNAME_LOCKED');assert.equal((await a.call('/v1/quotes',null,locked.playerToken)).data.self.nickname,'排行榜股友');assert.equal((await a.call('/v1/quotes',{text:'另一句'},locked.playerToken)).status,200);
+ assert.equal(a.DB.db.prepare('SELECT nickname FROM sf_stock_quotes WHERE player_id=?').get(locked.playerId).nickname,'排行榜股友');
+});
+
+test('the bounded snapshot matches each individual tab, hides private fields and includes only the current player’s like state',async()=>{
+ const a=setup(),fan=await a.who();for(let i=0;i<65;i++){const id='snapshot-'+String(i).padStart(3,'0');a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run(id,id,1);a.DB.db.prepare('INSERT INTO sf_stock_quotes(id,player_id,body,nickname,avatar_id,avatar_character,featured,featured_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(id,id,'第'+i+'句','股友'+i,i%10+1,i%2?'xiaoxiaojiu':'xiaojiu',i%2,i,i,1);}
+ a.DB.db.exec("UPDATE sf_stock_quotes SET hidden=1 WHERE id='snapshot-064';UPDATE sf_players SET banned=1 WHERE id='snapshot-063'");await a.call('/v1/quotes/snapshot-001/like',{liked:true},fan.playerToken);
+ const snap=(await a.call('/v1/quote-boards',null,fan.playerToken)).data;
+ for(const tab of ['popular','latest','featured']){const single=(await a.call('/v1/quotes?tab='+tab,null,fan.playerToken)).data;assert.deepEqual(snap.tabs[tab].items,single.items);assert.deepEqual(snap.self,single.self);assert.ok(snap.tabs[tab].items.length<=50);for(const row of snap.tabs[tab].items)for(const k of ['player_id','featured_at','popular_rank','token_hash'])assert.ok(!(k in row));}
+ assert.equal(snap.tabs.popular.items[0].liked,1);assert.equal((await a.call('/v1/quote-boards')).data.tabs.popular.items[0].liked,0);
+});
+
+test('admin content and nickname filters are literal partial matches with featured/status filters, safe sorting and matching totals',async()=>{
+ const a=setup(),admin=await a.admin();for(let i=0;i<55;i++){const id='filter-'+String(i).padStart(3,'0');a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run(id,id,1);a.DB.db.prepare('INSERT INTO sf_stock_quotes(id,player_id,body,nickname,featured,hidden,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,id,i===0?'保留%_文字':i%2?'紀律重要':'風險重要',i===0?'測試_百分%':'測試股友'+i,i%3===0?1:0,i===0?1:0,i,i);}
+ const read=async params=>(await a.call('/admin/api/quotes?'+new URLSearchParams(params),null,null,admin)).data;
+ const first=await read({});assert.equal(first.items.length,50);assert.equal(first.total,55);assert.equal(first.hasMore,true);assert.equal((await read({page:1})).items.length,5);
+ assert.equal((await read({q:'%_'})).total,1);assert.equal((await read({nickname:'_百分%'})).total,1);assert.equal((await read({nickname:"' OR 1=1 --"})).total,0);
+ const filtered=await read({q:'紀律',nickname:'股友',featured:'yes',status:'active',sort:'oldest'});assert.ok(filtered.items.length>0);assert.ok(filtered.items.every(r=>r.body.includes('紀律')&&r.nickname.includes('股友')&&r.featured===1&&r.hidden===0));assert.equal(filtered.total,filtered.items.length);
+ a.DB.db.exec("INSERT INTO sf_stock_quote_likes VALUES ('filter-001','filter-002',1)");assert.equal((await read({sort:'likes'})).items[0].id,'filter-001');assert.equal((await read({sort:'oldest'})).items[0].id,'filter-000');assert.equal((await read({status:'revoked'})).total,1);
+ for(const params of [{sort:'likes; DROP TABLE sf_players'},{status:'invalid'},{featured:'invalid'}])assert.equal((await a.call('/admin/api/quotes?'+new URLSearchParams(params),null,null,admin)).status,400);
+});
+
+test('author migration keeps existing quote text, status, likes and dates while recovering a prior nickname',()=>{
+ const db=new DatabaseSync(':memory:'),dir=new URL('../migrations/',import.meta.url);for(const name of fs.readdirSync(dir).filter(n=>n.endsWith('.sql')&&n<'0016').sort())db.exec(fs.readFileSync(new URL(name,dir),'utf8'));
+ db.prepare('INSERT INTO sf_players(id,token_hash,created_at,nickname) VALUES (?,?,?,?)').run('old-author','hash',1,'原本股友');db.prepare('INSERT INTO sf_stock_quotes(id,player_id,body,hidden,featured,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run('old-quote','old-author','原本的金句',1,0,22,33);db.prepare('INSERT INTO sf_stock_quote_likes VALUES (?,?,?)').run('old-quote','old-author',23);
+ db.exec(fs.readFileSync(new URL('0016_quote_authors.sql',dir),'utf8'));const r=db.prepare('SELECT * FROM sf_stock_quotes').get();assert.equal(r.body,'原本的金句');assert.equal(r.hidden,1);assert.equal(r.created_at,22);assert.equal(r.updated_at,33);assert.equal(r.nickname,'原本股友');assert.equal(r.avatar_id,1);assert.equal(r.avatar_character,'xiaojiu');assert.equal(db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes').get().n,1);db.close();
 });
