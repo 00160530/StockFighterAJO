@@ -16,6 +16,18 @@
 .watchlist #watchItems{overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;min-height:0}
 .watchlist .watch-item[data-symbol=TAIEX]{position:sticky;top:0;z-index:3;background:#fff;box-shadow:0 1px 0 #d8e6dd}
 .watchlist .watch-item[data-symbol=TAIEX].selected{background:#ecf3ef}
+.watch-row{position:relative;border-top:1px solid #eff4f1;min-width:0}
+.watch-row.selected{background:#ecf3ef}
+#gameShell .watchlist .watch-item{padding:5px 10px}
+#gameShell .watchlist .watch-bottom{margin-top:0}
+#gameShell .watchlist>.panel-head{padding:6px 12px}
+#gameShell .watchlist>.market-switch{padding:4px 10px 5px}
+.watch-row .watch-bottom>span{padding-left:20px}
+.watch-pin{position:absolute;left:9px;bottom:5px;display:grid;place-items:center;width:20px;height:18px;padding:1px;border-radius:3px;color:#8a9e91;z-index:1}
+.watch-pin svg{display:block;width:13px;height:13px}
+.watch-pin[aria-pressed=true]{color:#3f7657;background:#dfeee4}
+.watch-pin:hover,.watch-pin:focus-visible{color:#315e44;background:#e6f1e9}
+@media(max-width:650px){#gameShell .watch-row{flex:0 0 128px;min-width:128px;border-top:0;border-left:1px solid #eef1e8}.watch-pin{bottom:5px}}
 @media(min-width:1000px){
  .chart-dialog .chart-foot{flex-wrap:nowrap}
  .chart-dialog .chart-foot #chipNote{flex:0 1 auto;max-width:35%;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

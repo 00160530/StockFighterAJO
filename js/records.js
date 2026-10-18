@@ -30,6 +30,7 @@ function snapshot(market,s,reason='current',now=new Date().toISOString()){
  const skillUses={mother:log.filter(l=>l.type==='skill-loan').length,vip:log.filter(l=>l.type==='skill-vip').length,divination:log.filter(l=>l.type==='skill-divination').length,...(s.skills?.calendarUsed?{calendar:s.skills.calendarUsed}:{})};
  return {id:s.runId,rewardRootId:s.rewardRootId||s.runId,playTimeMs:Number.isSafeInteger(s.playTimeMs)&&s.playTimeMs>=0?s.playTimeMs:null,playTimePartial:s.playTimePartial===true,skillUses,at:now,date:s.day<0?'2020-01-01':date,status:s.status,reason,mode,ruleset:(mode==='life'?'tw-life-v1':'tw-v1')+(financing==='margin'?':margin-v1':''),startDate:s.startDate||market.data.start,customStartDate:s.customStartDate||null,earlySettlementDate:s.earlySettlementDate||null,...(s.dateJumps?.length?{dateJumps:s.dateJumps.map(j=>({...j}))}:{}),datasetEnd:market.data.end,sessions:market.sessions(s),equity,benchmark,cash:s.cash,returnPct:(equity/1e6-1)*100,alpha:(equity-benchmark)/1e6*100,maxDrawdown:drawdown,...tradeStats(market.data,log),spent:s.spent,choices:log.filter(l=>l.type==='story').length,financing,margin:{totalBorrowed:margin.totalBorrowed,totalInterest:margin.totalInterest,interestPaid:margin.interestPaid,totalTopups:margin.totalTopups,liquidations:margin.liquidations,principal:margin.principal,interest:margin.interest,collateral:margin.collateral},bankruptcyReason:s.bankruptcyReason||null};
 }
+function positions(s){return Object.entries(s.holdings).flatMap(([id,h])=>{const margin=s.margin?.positions[id],rows=[],cashQty=h.qty-(margin?.qty||0);if(cashQty>0)rows.push({id,financing:'cash',qty:cashQty,cost:money(h.cost-(margin?.cost||0))});if(margin?.qty>0)rows.push({id,financing:'margin',qty:margin.qty,cost:margin.cost});return rows;});}
 function inventory(market,s){
  const date=market.date(s),rows=Object.entries(s.holdings).map(([id,h])=>{
   const inst=market.data.instruments[id],priceBar=market.latest(id,date),price=priceBar?.[4]||0,value=money(price*h.qty),pnl=money(value-h.cost);
@@ -55,5 +56,5 @@ function leaderboard(book,outcome='won',edition=null){
  if(!['won','lost'].includes(outcome))throw Error('未知排行榜');
  return normalize(book).runs.filter(r=>r.status===outcome&&(!edition||(r.ruleset?.replace(/:margin-v1$/,'')===edition.ruleset.replace(/:margin-v1$/,'')&&r.datasetEnd===edition.datasetEnd))).slice().sort((a,b)=>b.equity-a.equity||(outcome==='lost'?(a.maxLoss?.pnl||0)-(b.maxLoss?.pnl||0):(b.maxGain?.pnl||0)-(a.maxGain?.pnl||0))||a.trades-b.trades||a.at.localeCompare(b.at)||a.id.localeCompare(b.id)).slice(0,100);
 }
-root.TaiguRecords={snapshot,normalize,best,upsert,valid,history,tradeStats,leaderboard,inventory};
+root.TaiguRecords={snapshot,normalize,best,upsert,valid,history,tradeStats,leaderboard,positions,inventory};
 })(globalThis);
