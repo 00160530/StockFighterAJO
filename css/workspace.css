@@ -1,0 +1,153 @@
+/* The chart, theatre and controls share one column; orders and holdings share the other. */
+.event-skill-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0;grid-column:1/-1}
+.event-skill-tools button{flex:0 0 auto;border:1px solid #a9c8b5;border-radius:6px;background:#fff;color:#365e46;padding:8px 12px;font:inherit;font-size:13px}
+.last-forecast{font-size:12px;line-height:1.65;color:#3e6651;overflow-wrap:anywhere}
+.event-skill-tools .last-forecast{flex:1 1 140px;margin:0}
+.divination-use{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.divination-use .last-forecast{flex:1 1 210px;margin:0!important}
+.skill-cards button{border:1px solid #abc8b7;border-radius:6px;background:#f4f9f6;color:#365e46;cursor:pointer}
+.skill-cards button:disabled{opacity:.5;cursor:default}
+.jump-date-selects{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border:0;padding:0;margin:0;min-width:0}
+.jump-date-selects legend{float:left;line-height:42px;margin-right:8px;font-size:14px}
+.jump-date-selects select{font:inherit;font-size:15px;color:#2e5840;border:1px solid #b8d1c2;background:#fff;border-radius:7px;padding:9px 30px 9px 10px;min-height:42px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]){width:min(860px,94vw);max-height:94dvh;overflow:hidden}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump])[open]{display:flex;flex-direction:column}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) .dialog-heading{position:static;padding:12px 20px;flex:0 0 auto}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) .dialog-heading h2{font-size:19px;line-height:1.5}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) #utilityContent{padding:14px 20px;min-height:0;font-size:13px;line-height:1.65;display:grid;gap:10px}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) #utilityContent p{margin:0}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing]) .journey-cg{width:100%;height:clamp(130px,29dvh,280px);max-height:none;object-fit:cover;object-position:50% 38%;border-radius:9px}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) .journey-warning{padding:9px 12px;font-size:12px;line-height:1.6}
+.utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) .dialog-actions{margin:2px 0 0;gap:10px}
+.utility-dialog[data-view=early-processing]{height:auto!important}
+.utility-dialog[data-view=early-processing] .share-processing{padding:8px!important}
+.journey-form{width:100%;max-width:none;gap:14px}
+#jumpDateHint{min-height:0;font-size:12px}
+
+/* A complete margin call fits a laptop viewport at normal text size. */
+.margin-dialog{width:min(820px,94vw);max-height:94dvh}
+.margin-dialog .dialog-heading{position:static;padding:11px 18px}
+.margin-dialog h2{font-size:20px;line-height:1.5}
+.margin-dialog-body{padding:12px 18px;max-height:none;overflow:visible;font-size:13px;line-height:1.5}
+.margin-summary{gap:6px;margin:8px 0}
+.margin-summary article{padding:7px 10px;gap:2px}
+.margin-summary span{font-size:11px}
+.margin-summary strong{font-size:18px;line-height:1.4}
+.margin-call-banner{padding:8px 12px}
+.margin-call-banner h3{font-size:18px;margin:0 0 3px}
+.margin-call-banner p{font-size:12px;line-height:1.5}
+.margin-topup-form{padding:6px 0;gap:6px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:end}
+.margin-topup-form label{width:auto;min-width:0;font-size:12px;gap:3px}
+.margin-topup-form input{padding:7px 9px;font-size:16px;width:100%}
+.margin-topup-form button,.margin-actions button{padding:8px 11px;font-size:13px}
+.margin-topup-form p:empty{display:none}
+.margin-topup-form p{grid-column:1/-1;margin:0}
+.margin-dialog-body>p{font-size:12px;line-height:1.5;margin:6px 0}
+.margin-positions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px}
+.margin-positions p{font-size:12px;line-height:1.5;margin:4px 0}
+.margin-dialog .margin-records{padding:7px 10px;margin:8px 0;gap:5px 20px;font-size:11px}
+.margin-dialog .margin-records b{font-size:15px}
+.margin-dialog .margin-actions{margin-top:9px}
+.margin-dialog details.margin-guide{font-size:12px}
+.margin-dialog[data-view=help] .margin-dialog-body,.margin-dialog details[open].margin-guide{max-height:calc(94dvh - 80px);overflow:auto}
+.margin-phone{padding:0}
+.phone-ring{width:65px;height:65px;margin:16px auto 10px}
+.phone-ring span{font-size:34px}
+.margin-phone[data-stage=connected] .phone-ring{width:42px;height:42px;margin:5px auto}
+.margin-phone[data-stage=connected] .phone-ring span{font-size:25px}
+.margin-phone h3{font-size:20px;margin:6px 0 2px}
+.phone-incoming{font-size:12px;margin:4px 0}
+.phone-subtitle{font-size:11px;margin-bottom:8px}
+.phone-dialogue{margin:8px 0;gap:8px}
+.call-words{padding:7px 11px;font-size:13px;line-height:1.55;flex:1}
+.call-words p{margin:4px 0}
+.phone-required{font-size:13px;line-height:1.5;margin:8px 0}
+.phone-choices button{padding:8px 11px;font-size:13px}
+
+@media(min-width:1100px) and (min-height:620px){
+ #gameShell .workspace{grid-template-columns:145px minmax(0,1fr) 330px}
+ #gameShell .center-column{grid-template-columns:minmax(0,1fr) minmax(220px,29%);grid-template-rows:minmax(0,1fr) clamp(210px,30dvh,270px);gap:10px}
+ #gameShell .chart-panel{grid-column:1/-1;grid-row:1}
+ #gameShell .story-panel{grid-column:1;grid-row:2;grid-template-columns:62px minmax(0,1fr);grid-template-rows:32px minmax(0,1fr) auto 20px;gap:0 8px;min-width:0}
+ #gameShell .story-panel .panel-head{padding:6px 10px;gap:6px}
+ #gameShell .story-panel .story-badge{max-width:44%;font-size:8px}
+ #gameShell .speaker-row{grid-row:2;grid-column:1;padding:7px 0 0 6px;min-width:0}
+ #gameShell .speaker-row .avatar{width:54px;height:54px}
+ #gameShell .speaker-row strong{font-size:10px}
+ #gameShell .speaker-row small{font-size:8px;line-height:1.3}
+ #gameShell .story-body,#gameShell .story-panel:not(:has(.choice-btn)) .story-body{grid-column:2;grid-row:2;padding:7px 10px 0 0;min-height:0}
+ #gameShell .story-body h3{font-size:13px;line-height:1.4;margin-bottom:4px}
+ #gameShell .story-body p{font-size:12px;line-height:1.6}
+ #gameShell #storyChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-row:3;grid-column:1/-1;padding:6px 9px;gap:6px}
+ #gameShell #storyChoices:empty{display:none}
+ #gameShell .choice-btn{font-size:11px;line-height:1.45;padding:6px 8px;min-height:30px}
+ #gameShell .story-hint{grid-column:1/-1;grid-row:4;font-size:9px;padding:0 9px;margin:0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #gameShell .advance-panel{grid-row:2;grid-column:2;padding:10px;grid-template-columns:1fr;gap:7px;align-content:start;min-width:0;min-height:0}
+ #gameShell .advance-info{display:grid;gap:3px;grid-column:1}
+ #gameShell .advance-info span{font-weight:650;font-size:12px}
+ #gameShell .advance-info b{font-size:10px;line-height:1.5;white-space:normal}
+ #gameShell .advance-panel>button{grid-column:1;padding:7px 9px;font-size:12px;min-height:30px}
+ #gameShell .advance-panel .skip-row{grid-column:1;gap:6px}
+ #gameShell .event-skill-tools{gap:5px;grid-column:1}
+ #gameShell .event-skill-tools button{padding:6px 10px;font-size:12px}
+ #gameShell .event-skill-tools .last-forecast{flex-basis:100%;font-size:10px;line-height:1.5}
+ #gameShell .advance-panel .playback-controls{grid-column:1;gap:5px;min-height:0}
+ #gameShell .advance-panel .playback-controls label{font-size:11px}
+ #gameShell .playback-controls select{font-size:11px;padding:4px 6px}
+ #gameShell .right-column{display:grid;grid-template-columns:1fr;grid-template-rows:max-content minmax(0,1fr);gap:10px;overflow:visible;min-height:0}
+ #gameShell .trade-panel{gap:5px 8px;padding:0 10px 8px;min-height:0;align-self:stretch;overflow:visible}
+ #gameShell .trade-panel .panel-head{padding:8px 10px;margin:0 -10px}
+ #gameShell .trade-symbol b,#gameShell .trade-symbol strong{font-size:13px}
+ #gameShell .trade-panel .side-switch{margin:0;padding:2px}
+ #gameShell .side-switch button{padding:5px;font-size:12px}
+ #gameShell .quantity-input{padding:6px 8px;min-height:50px}
+ #gameShell .quantity-input input{font-size:21px}
+ #gameShell .quick-qty{gap:4px}
+ #gameShell .quick-qty button{padding:4px 2px;font-size:10px}
+ #gameShell .trade-panel .cost-summary{padding:3px 0!important;gap:3px!important}
+ #gameShell .trade-panel .cost-summary>div{font-size:10px;line-height:1.5}
+ #gameShell .trade-panel .cost-summary b{font-size:11px;line-height:1.5;margin:0}
+ #gameShell .order-actions{grid-column:1/-1;margin:0;gap:8px}
+ #gameShell .trade-panel .order-actions .order-button{font-size:12px;padding:8px 10px;min-height:34px}
+ #gameShell .margin-check{font-size:12px}
+ #gameShell .trade-panel .credit-status{grid-column:1/-1;width:100%;margin:0;padding:5px 7px}
+ #gameShell .trade-panel .trade-note{padding:0;font-size:10px;line-height:1.5}
+ #gameShell .trade-panel .inline-message{font-size:10px;line-height:1.4}
+ #gameShell .portfolio-panel{min-height:0;min-width:0}
+ #gameShell #portfolioContent{min-height:0;max-height:none;overflow:auto}
+ #gameShell .portfolio-panel .panel-head{min-height:38px;padding:0 9px}
+ #gameShell .tabs button{padding:9px 0;font-size:11px}
+ #gameShell .empty-state{padding:16px 12px}
+ #gameShell .portfolio-panel tr{padding:7px 0;gap:3px 6px}
+ #gameShell .portfolio-panel td{font-size:11px}
+}
+@media(min-width:1100px) and (max-height:740px) and (min-height:620px){
+ #gameShell .center-column{grid-template-rows:minmax(0,1fr) 215px}
+ #gameShell .trade-panel{gap:4px 8px}
+ #gameShell .trade-panel .panel-head{padding-top:6px;padding-bottom:6px}
+ #gameShell .trade-note{font-size:9px!important}
+ #gameShell .advance-panel{gap:5px;padding:8px}
+ #gameShell .story-body p{font-size:11px}
+ #gameShell .choice-btn{font-size:10px;padding:5px 7px}
+}
+@media(max-width:1099px),(max-height:619px){
+ .center-column>.advance-panel{width:100%;box-sizing:border-box}
+ .center-column>.advance-panel .event-skill-tools{grid-column:1/-1}
+ .margin-dialog{max-height:96dvh;overflow:auto}
+ .margin-dialog-body{overflow:visible;max-height:none}
+ .margin-topup-form{grid-template-columns:1fr 1fr}
+ .margin-topup-form label{grid-column:1/-1}
+ .utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]){max-height:96dvh}
+ .utility-dialog:is([data-view=early-confirm],[data-view=early-processing],[data-view=date-jump]) #utilityContent{font-size:12px;gap:8px;padding:12px 16px}
+}
+@media(max-width:600px){
+ .margin-dialog .margin-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .margin-summary article{padding:6px;min-width:0}
+ .margin-summary span{font-size:10px}
+ .margin-summary strong{font-size:14px}
+ .phone-choices{gap:6px}.phone-choices button{font-size:12px}
+ .utility-dialog:is([data-view=early-confirm],[data-view=early-processing]) .journey-cg{height:20dvh}
+ .jump-date-selects{gap:6px}.jump-date-selects legend{float:none;width:100%;line-height:1.5}
+ .jump-date-selects select{padding-right:20px;font-size:14px}
+}
