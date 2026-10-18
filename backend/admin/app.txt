@@ -24,7 +24,7 @@ function runTable(rows){
   const tr=el('tr');tr.dataset.revoked=!!r.hidden;
   const cell=(...nodes)=>{const td=el('td');td.append(...nodes);tr.append(td);return td;};
   cell(el('strong',r.nickname),el('small',r.id,'run-id'));
-  cell(el('span',r.mode==='life'?'人生模式':'自由模式'),el('small',r.outcome==='won'?'贏過大盤':'未贏大盤'),el('small',r.financing?'曾使用融資':'現股'));
+  cell(el('span',r.mode==='life'?'人生模式':'自由模式'),el('small',r.outcome==='won'?'贏過大盤':'未贏大盤'),el('small',r.financing?'曾使用融資':'現股'),el('small','起始 '+(r.start_date||'2020-01-02')),el('small','提前結算 '+(r.early_settlement_date||'未使用')),el('small','日期跳躍 '+JSON.parse(r.date_jumps||'[]').map(j=>j.from+' → '+j.to).join('、')));
   cell(el('strong',money(r.equity_cents),'run-equity'));
   const delta=r.benchmark_cents>0?(r.equity_cents/r.benchmark_cents-1)*100:null;
   cell(el('strong',delta===null?'—':(delta>0?'贏過 ':delta<0?'落後 ':'持平 ')+Math.abs(delta).toFixed(2)+'%'),el('small','大盤 '+money(r.benchmark_cents)));
@@ -32,7 +32,7 @@ function runTable(rows){
   cell(el('strong',r.trades.toLocaleString('zh-TW')+' 次'));
   cell(el('span',duration(r.play_time_ms)),...(r.play_time_partial?[el('small','從新版開始累計')]:[]));
   const uses=r.skill_uses?JSON.parse(r.skill_uses):null,details=el('details'),summary=el('summary','更多統計'),m=JSON.parse(r.margin_summary||'{}');
-  const statCell=cell(el('span',uses?'媽媽 '+uses.mother+' · VIP '+uses.vip+' · 奇門 '+uses.divination:'技能次數未記錄','skill-counts'),el('small','累計融資 '+money(m.totalBorrowedCents||0)));
+  const statCell=cell(el('span',uses?'媽媽 '+uses.mother+' · VIP '+uses.vip+' · 奇門 '+uses.divination+' · 跳躍 '+(uses.calendar||0):'技能次數未記錄','skill-counts'),el('small','累計融資 '+money(m.totalBorrowedCents||0)));
   details.append(summary,el('p','技能次數：'+(uses?'媽媽10塊 '+uses.mother+' 次 · 林北VIP拉 '+uses.vip+' 次 · 奇門遁甲 '+uses.divination+' 次':'尚無紀錄')),el('p','資產從高點最大跌幅 '+(r.drawdown_bps/100).toFixed(2)+'%'));
   if(r.financing)details.append(el('p','累計融資 '+money(m.totalBorrowedCents||0)+' · 利息 '+money(m.totalInterestCents||0)+' · 斷頭 '+(m.liquidations||0)+' 次'),el('p','累計補款 '+money(m.totalTopupsCents||0)+' · 已付利息 '+money(m.interestPaidCents||0)),el('p','剩餘本金 '+money(m.principalCents||0)+' · 未付利息 '+money(m.interestCents||0)+' · 保證金 '+money(m.collateralCents||0)));
   details.append(el('p','原始報酬率差 '+(r.score>=0?'+':'')+(r.score/100).toFixed(2)+' 百分點'));statCell.append(details);

@@ -159,6 +159,8 @@ node tools/smoke.mjs --base https://YOUR_REAL_WORKER_URL --origin https://YOUR_R
 
 程式更新後執行前後端測試。只有更新行情才需執行 `node backend/tools/build-edition.mjs`；這會保留原始設定中的 API 選擇、自動更新版本識別，不會加入其他人的 API，也不會把本機 `.env` 寫入原始檔。接著重新建置 Pages，API 仍從部署變數或自己的本機設定取得。行情與規則改版如影響 `editionId`，需協調 Worker 和 Pages 發布，原有驗證規則不變。
 
+0.15.0 起，同一指令也會產生 `backend/src/start-benchmarks.mjs`，保留舊版自訂起點的日期、交易日數與 0050 基準驗證。日期跳躍沿用原起點，不重設基準。更新行情後應連同此檔案發布 Worker。從舊版升級時，先確認目標環境、套用新增欄位的 Migration，再發布相容舊前端的 Worker，最後發布 Pages；詳見 [人生遙控器與日期跳躍](JOURNEY-SKILLS.md)。
+
 ## 10. 常見問題
 
 | 問題 | 檢查方式 |

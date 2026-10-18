@@ -31,9 +31,9 @@ test('chart fall reveals only copied current-day OHLC, falls monotonically, and 
 
 test('prelude holds the day and delays offer; hidden tabs cannot skip its fall or the final choice',async()=>{
  const h=sceneHarness();let done=false;const p=h.scene.leadIn(h.context,h.chart).then(()=>done=true);assert.equal(h.scene.leading,true);assert.equal(h.scene.leadDialog.open,true);assert.equal(h.eventDialog.open,false);assert.throws(()=>h.scene.leadIn(h.context,h.chart),/已在進行/);
- h.tick(1600);assert.equal(done,false);assert.ok(h.progress.at(-1)>0&&h.progress.at(-1)<1);const progress=h.progress.at(-1),elapsed=h.scene.leadElapsed;
- h.visibility(true);h.tick(20000);assert.equal(h.scene.leadElapsed,elapsed);assert.equal(h.progress.at(-1),progress);assert.equal(done,false);h.visibility(false);h.tick(1600);assert.equal(done,false);assert.equal(h.eventDialog.open,false);
- h.tick(640);await p;assert.equal(done,true);assert.equal(h.progress.at(-1),1);assert.equal(h.frames.size,0);assert.equal(h.scene.leadDialog.open,true,'darkness remains until choice dialog is ready');assert.equal(h.eventDialog.open,false);
+ h.tick(400);assert.equal(done,false);assert.ok(h.progress.at(-1)>0&&h.progress.at(-1)<1);const progress=h.progress.at(-1),elapsed=h.scene.leadElapsed;
+ h.visibility(true);h.tick(20000);assert.equal(h.scene.leadElapsed,elapsed);assert.equal(h.progress.at(-1),progress);assert.equal(done,false);h.visibility(false);h.tick(320);assert.equal(done,false);assert.equal(h.eventDialog.open,false);
+ h.tick(480);await p;assert.equal(done,true);assert.equal(h.progress.at(-1),1);assert.equal(h.frames.size,0);assert.equal(h.scene.leadDialog.open,true,'darkness remains until choice dialog is ready');assert.equal(h.eventDialog.open,false);
  const choice=h.scene.offer(h.context);assert.equal(h.scene.leading,false);assert.equal(h.scene.leadDialog.open,false);assert.equal(h.eventDialog.open,true);assert.equal(h.ended,1);h.scene.choose(false);assert.equal(await choice,false);assert.equal(h.scene.active,false);h.scene.choose(true);assert.equal(h.scene.offering,false);
 });
 

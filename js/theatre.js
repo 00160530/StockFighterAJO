@@ -72,6 +72,7 @@ function create(market){
   return {id,name:p.name,date,drop:b[4]/a[4]-1,marketDrop,chipDate,institutionalNet,rows:rows.slice(-24).map(r=>r.slice()),entry:p.entry};
  }
  function supportCandidate(s,selected){
+  if((s.supportGames||[]).filter(g=>g.choice==='use'||g.choice===undefined&&g.finished).length>=2)return null;
   const last=s.supportGames?.at(-1);if(last&&s.day-data.calendar.indexOf(last.date)<COOLDOWN)return null;
   for(const id of [selected,...Object.keys(s.holdings)].filter((id,i,a)=>s.holdings[id]&&a.indexOf(id)===i)){const candidate=supportContext(s,id);if(candidate)return candidate;}return null;
  }

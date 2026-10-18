@@ -22,6 +22,13 @@ for(const date of data.calendar){let overnight=1,intraday=1;
 }
 const edition={id:'tw-2020-'+data.end+'-'+datasetId.slice(0,16),datasetId,datasetEnd:data.end,start:data.start,sessions:data.calendar.length,benchmarkCents,initialCents:100000000,maxEquityCents:Math.min(Number.MAX_SAFE_INTEGER,Math.ceil(bound*100)),maxTrades:data.calendar.length*Object.values(data.instruments).filter(i=>i.tradable).length,symbols:Object.entries(data.instruments).filter(([,i])=>i.tradable).map(([id,i])=>({id,name:i.name})),rulesets:{life:'tw-life-v1',free:'tw-v1'},minDurationSeconds:{life:120,free:10},sessionTtlSeconds:30*86400};
 fs.mkdirSync(path.join(root,'backend/src'),{recursive:true});fs.writeFileSync(path.join(root,'backend/src/edition.mjs'),'// Generated from the shipped market and existing engine.\nexport const EDITION='+JSON.stringify(edition,null,2)+';\n');
+// Same engine, same opening fees, dividends and splits for each permitted start.
+const starts={};for(let i=0;i<data.calendar.length;i++){
+ const date=data.calendar[i],run=market.fresh('free',false,null,{startDate:date,unlocked:true});
+ while(run.status==='playing')market.next(run);
+ starts[date]={index:i,sessions:data.calendar.length-i,benchmarkCents:Math.round(market.equity(run.benchmark,market.date(run))*100)};
+}
+fs.writeFileSync(path.join(root,'backend/src/start-benchmarks.mjs'),'// Generated using the existing daily engine; do not hand edit.\nexport const START_BENCHMARKS='+JSON.stringify(starts)+';\n');
 const configPath=path.join(root,'data/online-config.js');
 const config=publicConfig({...readConfig(configPath),editionId:edition.id,datasetId});
 // Preserve source API choice; private/env settings only enter deployment artifacts.

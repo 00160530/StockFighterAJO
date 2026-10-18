@@ -6,6 +6,7 @@ const c={window:{}};vm.createContext(c);
 for(const f of ['data/market.js','js/engine.js','js/theatre.js'])vm.runInContext(fs.readFileSync(new URL('../'+f,import.meta.url),'utf8'),c);
 const T=c.TaiguTheatre,m=c.TaiguEngine.createMarket(c.window.TAIGU_DATA),t=T.create(m);
 const copy=x=>JSON.parse(JSON.stringify(x));
+test('two used support scenes suppress later triggers for the same run and the cap survives save reload',()=>{let s=m.fresh('life');s.opening=false;m.next(s);m.openWindow(s,'test-buy');m.queue(s,'0050','buy',1000);m.next(s);let used=0;while(s.status==='playing'){const candidate=t.supportCandidate(s,'0050');if(candidate){used++;assert.ok(used<=2);const row=t.begin(s,candidate);t.decide(s,row,true);t.finish(s,row,0);if(used===2)s=m.validate(copy(s));}m.next(s);}assert.equal(used,2);assert.equal(s.supportGames.filter(g=>g.choice==='use').length,2);assert.doesNotThrow(()=>m.validate(copy(s)));});
 function small(prices=[100,96,90],split=[],id='0050'){
  const dates=prices.map((_,i)=>'2020-01-'+String(i+2).padStart(2,'0')),data={calendar:dates,instruments:{[id]:{name:id==='0050'?'台灣50':'台積電',tradable:true,splits:split,rows:prices.map((p,i)=>[dates[i],p+2,p+3,p-2,p,100])}}};
  data.instruments.TAIEX={name:'加權指數',tradable:false,rows:dates.map((d,i)=>[d,100,101,i===dates.length-1?96:98,i===dates.length-1?97:100]),chips:Object.fromEntries(dates.map(d=>[d,{foreign:-120e8,trust:20e8,dealer:-10e8}]))};
