@@ -13,25 +13,39 @@ function setup(){
   assert.notEqual(r.status,500,DB.errors.join('\n'));return {status:r.status,data:await r.json()};
  }
  async function who(){return (await call('/v1/players',{})).data;}
- async function complete(p,{mode='life',outcome='lost'}={}){
+ async function complete(p,{mode='life',outcome='lost',upload=true,name='金句小韭'}={}){
   const session=(await call('/v1/sessions',{runId:crypto.randomUUID(),mode,editionId:EDITION.id,startDay:-1},p.playerToken)).data;
   DB.db.prepare('UPDATE sf_sessions SET created_at=created_at-180 WHERE id=?').run(session.sessionId);
-  const equity=outcome==='won'?600000000:100000000,body={...session,editionId:EDITION.id,mode,outcome,date:EDITION.datasetEnd,sessions:EDITION.sessions,equityCents:equity,benchmarkCents:EDITION.benchmarkCents,score:Math.round((equity-EDITION.benchmarkCents)/10000),drawdownBps:0,trades:outcome==='won'?2:0,buyTrades:outcome==='won'?1:0,sellTrades:outcome==='won'?1:0,maxGain:null,maxLoss:null,nickname:'金句小韭'};
+  const equity=outcome==='won'?600000000:100000000,body={...session,editionId:EDITION.id,mode,outcome,date:EDITION.datasetEnd,sessions:EDITION.sessions,equityCents:equity,benchmarkCents:EDITION.benchmarkCents,score:Math.round((equity-EDITION.benchmarkCents)/10000),drawdownBps:0,trades:outcome==='won'?2:0,buyTrades:outcome==='won'?1:0,sellTrades:outcome==='won'?1:0,maxGain:null,maxLoss:null,nickname:name};
   delete body.createdAt;delete body.expiresAt;
-  const result=await call(mode==='life'?'/v1/completions':'/v1/scores',body,p.playerToken);assert.equal(result.status,200,JSON.stringify(result.data));return session;
+  const result=await call(mode==='life'?'/v1/completions':'/v1/scores',body,p.playerToken);assert.equal(result.status,200,JSON.stringify(result.data));if(mode==='life'&&upload){const score=await call('/v1/scores',body,p.playerToken);assert.equal(score.status,200,JSON.stringify(score.data));}return session;
  }
  async function admin(){const token='f'.repeat(64);DB.db.prepare('INSERT INTO sf_admin_credentials VALUES (?,?,?,?,?)').run('quote-owner','00','00',100000,1);DB.db.prepare('INSERT INTO sf_admin_sessions VALUES (?,?,?,?)').run(await hash(token),'quote-owner',1,9999999999);return {cookie:'sf_admin='+token,source:base};}
  return {DB,env,call,who,complete,admin};
 }
-test('only a server-verified completed life game qualifies, including a completed losing game',async()=>{
+test('only an uploaded valid life score qualifies, including a losing game; completion alone does not qualify',async()=>{
  const a=setup(),p=await a.who();assert.equal((await a.call('/v1/quotes',{text:'股友金句'})).status,401);
  assert.equal((await a.call('/v1/quotes',{text:'股友金句'},p.playerToken)).data.error.code,'LIFE_REQUIRED');
  await a.complete(p,{mode:'free',outcome:'won'});assert.equal((await a.call('/v1/quotes',{text:'自由模式不能留言'},p.playerToken)).status,403);
+ await a.complete(p,{upload:false});assert.equal((await a.call('/v1/quote-boards',null,p.playerToken)).data.self.eligible,false);assert.equal((await a.call('/v1/quotes',{text:'只有結算還不能留言'},p.playerToken)).data.error.message,'上傳排行榜後才可留言喔。');
  await a.complete(p);const view=(await a.call('/v1/quotes?tab=latest',null,p.playerToken)).data;assert.equal(view.self.eligible,true);
  assert.equal((await a.call('/v1/quotes',{text:'買進群創，身心受創'},p.playerToken)).status,200);
  const self=(await a.call('/v1/quotes',null,p.playerToken)).data.self;assert.equal(self.submitted,true);assert.equal(self.body,'買進群創，身心受創');
  const publicView=(await a.call('/v1/quotes')).data;assert.equal(publicView.self.submitted,false);for(const key of ['player_id','token_hash','sessionToken','playerToken','moderation_note'])assert.ok(!(key in publicView.items[0]));
 });
+test('revoked life scores do not grant eligibility; existing revoked quotes still consume the quota',async()=>{
+ const a=setup(),p=await a.who();await a.complete(p);
+ a.DB.db.prepare('UPDATE sf_runs SET hidden=1 WHERE player_id=?').run(p.playerId);
+ for(const route of ['/v1/quotes','/v1/quote-boards'])assert.equal((await a.call(route,null,p.playerToken)).data.self.eligible,false);
+ assert.equal((await a.call('/v1/quotes',{text:'被註銷後'},p.playerToken)).status,403);
+ a.DB.db.prepare('UPDATE sf_runs SET hidden=0 WHERE player_id=?').run(p.playerId);
+ assert.equal((await a.call('/v1/quotes',{text:'原本留言'},p.playerToken)).status,200);
+ a.DB.db.prepare('UPDATE sf_stock_quotes SET hidden=1 WHERE player_id=?').run(p.playerId);
+ a.DB.db.prepare('UPDATE sf_runs SET hidden=1 WHERE player_id=?').run(p.playerId);
+ const self=(await a.call('/v1/quote-boards',null,p.playerToken)).data.self;assert.equal(self.submitted,true);assert.equal(self.hidden,true);assert.equal(self.eligible,false);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quotes WHERE player_id=?').get(p.playerId).n,1);
+});
+
 test('quotes accept 25 Unicode code points, normalize whitespace and reject malformed or excessive text before writing',async()=>{
  const a=setup(),p=await a.who();await a.complete(p);
  for(const body of [{text:''},{text:' '},{text:'韭'.repeat(26)},{text:'😀'.repeat(26)},{text:'換\n行'},{text:'藏\u200b字'},{text:2},{text:'一句',hidden:0}])assert.equal((await a.call('/v1/quotes',body,p.playerToken)).status,400,JSON.stringify(body));
@@ -77,7 +91,7 @@ test('quote creation and likes retain existing origin, ban and rate protections'
 });
 
 test('quote authors support both characters and ten moods, preserve immutable author fields and reuse a locked leaderboard name',async()=>{
- const a=setup(),p=await a.who();await a.complete(p);
+ const a=setup(),p=await a.who();await a.complete(p,{name:'金句股友'});
  for(const change of [{nickname:'A'},{nickname:'<script>'},{avatarId:0},{avatarId:11},{avatarId:1.5},{avatarCharacter:'fake'},{avatarCharacter:null}])assert.equal((await a.call('/v1/quotes',{text:'安全金句',nickname:'金句股友',avatarId:10,avatarCharacter:'xiaoxiaojiu',...change},p.playerToken)).status,400);
  const body={text:'安全金句',nickname:'金句股友',avatarId:10,avatarCharacter:'xiaoxiaojiu'};assert.equal((await a.call('/v1/quotes',body,p.playerToken)).status,200);const row=(await a.call('/v1/quotes')).data.items[0];assert.equal(row.nickname,body.nickname);assert.equal(row.avatarId,10);assert.equal(row.avatarCharacter,'xiaoxiaojiu');assert.ok(row.createdAt>0);
  assert.equal((await a.call('/v1/quotes',{...body,avatarId:1},p.playerToken)).status,409);assert.equal((await a.call('/v1/quotes',body,p.playerToken)).status,200);

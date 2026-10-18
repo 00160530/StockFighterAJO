@@ -2,7 +2,7 @@ import {exactKeys,fail,integer,text,uuid,player,rate,nickname} from './security.
 const q=(env,sql,...args)=>env.DB.prepare(sql).bind(...args);
 const all=async s=>(await s.all()).results;
 const likes='(SELECT COUNT(*) FROM sf_stock_quote_likes l WHERE l.quote_id=q.id)';
-const eligibleSQL="SELECT 1 FROM sf_life_completions c LEFT JOIN sf_runs r ON r.session_id=c.session_id WHERE c.player_id=? AND (r.id IS NULL OR r.hidden=0) LIMIT 1";
+const eligibleSQL="SELECT 1 FROM sf_runs WHERE player_id=? AND mode='life' AND outcome IN ('won','lost') AND hidden=0 LIMIT 1";
 const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 export async function quoteList(request,env,tab){
  const sorts={popular:'likes DESC,q.created_at DESC,q.id DESC',latest:'q.created_at DESC,q.id DESC',featured:'q.featured_at DESC,q.created_at DESC,q.id DESC'};
@@ -30,7 +30,7 @@ export async function createQuote(request,env,body,now,ip){
  if(!['xiaojiu','xiaoxiaojiu'].includes(avatarCharacter))fail(400,'INVALID_AVATAR','角色頭像不正確。');
  if(profile?.nickname&&name!==profile.nickname)fail(409,'NICKNAME_LOCKED','請沿用這個匿名身分的排行榜暱稱。',{nickname:profile.nickname});
  await rate(env,'quote-player:'+who,10,3600,now);await rate(env,'quote-ip:'+ip,30,3600,now);
- if(!await q(env,eligibleSQL,who).first())fail(403,'LIFE_REQUIRED','完成一次人生模式後，才能留下金句。');
+ if(!await q(env,eligibleSQL,who).first())fail(403,'LIFE_REQUIRED','上傳排行榜後才可留言喔。');
  // The permanent unique player key also covers revoked quotes and concurrent requests.
  await q(env,`INSERT INTO sf_stock_quotes(id,player_id,body,created_at,updated_at,nickname,avatar_id,avatar_character) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(player_id) DO NOTHING`,crypto.randomUUID(),who,content,now,now,name,avatarId,avatarCharacter).run();
  const saved=await q(env,'SELECT id,body,nickname,avatar_id,avatar_character FROM sf_stock_quotes WHERE player_id=?',who).first();
