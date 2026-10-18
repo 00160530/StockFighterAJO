@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "mode": "life",
+  "life": {
+    "until": 2,
+    "openedAt": 0,
+    "anchorId": "old-save",
+    "windows": 1
+  },
+  "startDate": "2020-01-02",
+  "datasetEnd": "2026-10-16",
+  "datasetPrefix": "7c191819047d6681",
+  "playTimeMs": 0,
+  "playTimePartial": false,
+  "day": 1,
+  "cash": 990150,
+  "holdings": {
+    "0050": {
+      "qty": 100,
+      "cost": 9850
+    }
+  },
+  "receivables": [],
+  "benchmark": {
+    "cash": 29.55,
+    "holdings": {
+      "0050": {
+        "qty": 10289,
+        "cost": 999970.45
+      }
+    },
+    "receivables": [],
+    "reinvest": false
+  },
+  "orders": [],
+  "log": [
+    {
+      "date": "2020-01-02",
+      "type": "order",
+      "text": "買進委託 0050 100 股，次日開盤撮合",
+      "id": "0050",
+      "side": "buy",
+      "qty": 100,
+      "submitted": "2020-01-02"
+    },
+    {
+      "date": "2020-01-03",
+      "type": "fill",
+      "text": "買進 0050 100 股 @ 98.30",
+      "id": "0050",
+      "side": "buy",
+      "qty": 100,
+      "price": 98.3,
+      "value": 9830,
+      "fee": 20,
+      "tax": 0
+    }
+  ],
+  "seen": [],
+  "activeEvent": null,
+  "stress": 22,
+  "spent": 0,
+  "history": [
+    {
+      "date": "2019-12-31",
+      "player": 1000000,
+      "benchmark": 1000000
+    },
+    {
+      "date": "2020-01-02",
+      "player": 1000000,
+      "benchmark": 1004750.4
+    },
+    {
+      "date": "2020-01-03",
+      "player": 999915,
+      "benchmark": 1004750.4
+    }
+  ],
+  "status": "playing",
+  "opening": false,
+  "margin": {
+    "version": 1,
+    "enabled": true,
+    "positions": {},
+    "collateral": 0,
+    "totalBorrowed": 0,
+    "totalInterest": 0,
+    "interestPaid": 0,
+    "totalTopups": 0,
+    "liquidations": 0,
+    "call": null
+  },
+  "runId": "synthetic-legacy-stock-fixture"
+}

@@ -9,11 +9,11 @@ function createMarket(data){
  const bar=(id,d)=>maps[id]?.get(d)||null;
  function latest(id,d){const rows=data.instruments[id]?.rows||[];for(let i=rows.length-1;i>=0;i--)if(rows[i][0]<=d)return rows[i];return null;}
  const stamps=new Map();
- function datasetStamp(end){if(stamps.has(end))return stamps.get(end);const parts=[data.calendar.filter(d=>d<=end)];for(const id of Object.keys(data.instruments).sort()){const i=data.instruments[id];parts.push([id,i.rows.filter(r=>r[0]<=end),(i.splits||[]).filter(x=>x.date<=end),(i.dividends||[]).filter(x=>x.ex<=end),Object.keys(i.chips||{}).filter(d=>d<=end).sort().map(d=>[d,i.chips[d]])]);}const text=JSON.stringify(parts);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}const stamp=(a>>>0).toString(16).padStart(8,'0')+(b>>>0).toString(16).padStart(8,'0');stamps.set(end,stamp);return stamp;}
+ function datasetStamp(end,ids=Object.keys(data.instruments)){const key=end+'|'+[...ids].sort().join(',');if(stamps.has(key))return stamps.get(key);const parts=[data.calendar.filter(d=>d<=end)];for(const id of [...ids].sort()){const i=data.instruments[id];parts.push([id,i.rows.filter(r=>r[0]<=end),(i.splits||[]).filter(x=>x.date<=end),(i.dividends||[]).filter(x=>x.ex<=end),Object.keys(i.chips||{}).filter(d=>d<=end).sort().map(d=>[d,i.chips[d]])]);if(i.stockDividends?.length||i.capitalActions?.length)parts.push([(i.stockDividends||[]).filter(x=>x.ex<=end),(i.capitalActions||[]).filter(x=>x.date<=end)]);}const text=JSON.stringify(parts);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}const stamp=(a>>>0).toString(16).padStart(8,'0')+(b>>>0).toString(16).padStart(8,'0');stamps.set(key,stamp);return stamp;}
  function stamp(s){s.datasetPrefix=datasetStamp(s.datasetEnd);return s;}
  const account=()=>({cash:INITIAL,holdings:{},receivables:[]});
  function record(s,type,text,extra={}){s.log.push({date:date(s),type,text,...extra});}
- function equity(a,d){let v=a.cash+a.receivables.reduce((n,r)=>n+r.amount,0);for(const [id,h]of Object.entries(a.holdings))v+=h.qty*(latest(id,d)?.[4]||0);if(a.margin)v+=a.margin.collateral-Object.values(a.margin.positions).reduce((n,p)=>n+p.principal+p.interest,0);if(a.skills)v-=(a.skills.loans||[]).reduce((n,l)=>n+l.remaining,0);return money(v);}
+ function equity(a,d){let v=a.cash+receivableValue(a,d);for(const [id,h]of Object.entries(a.holdings))v+=h.qty*(latest(id,d)?.[4]||0);if(a.margin)v+=a.margin.collateral-Object.values(a.margin.positions).reduce((n,p)=>n+p.principal+p.interest,0);if(a.skills)v-=(a.skills.loans||[]).reduce((n,l)=>n+l.remaining,0);return money(v);}
  function affordable(cash,price){let q=Math.floor(cash/price);while(q>0&&money(q*price+fee(q*price))>cash)q--;return q;}
  function fill(a,id,side,qty,price){
   if(!Number.isSafeInteger(qty)||qty<1||!Number.isFinite(price)||price<=0)throw Error('交易數量或價格不正確');
@@ -31,8 +31,41 @@ function createMarket(data){
   }else throw Error('未知交易方向');
   return {id,side,qty,price,value,fee:commission,tax,...(side==='sell'?{costBasis,realizedPnl}:{})};
  }
+ function receivableValue(a,d){return money(a.receivables.reduce((n,r)=>n+(r.kind==='stock'?r.qty*(latest(r.id,d)?.[4]||0)+r.fractionCash:r.amount),0));}
+ function positionAdjustment(a,id,cb,text){const h=a.holdings[id],p=a.margin?.positions[id];cb?.('position-adjust',text,{id,cashQty:(h?.qty||0)-(p?.qty||0),cashCost:money((h?.cost||0)-(p?.cost||0)),marginQty:p?.qty||0,marginCost:p?.cost||0});}
+ function marginEpoch(a,p){if(!p.epoch)p.epoch=a.margin.positionSeq=(a.margin.positionSeq||0)+1;return p.epoch;}
+ function marginClaimValue(a,d,atOpen=false){return money(a.receivables.reduce((n,r)=>{const p=a.margin?.positions[r.id];if(!p||p.epoch!==r.marginEpoch)return n;return n+(r.kind==='stock'?r.marginQty*(bar(r.id,d)?.[atOpen?1:4]??latest(r.id,d)?.[4]??0):r.kind==='capital'?r.marginAmount||0:0);},0));}
+ function releaseCollateral(a){if(a.margin&&!Object.keys(a.margin.positions).length){a.cash=money(a.cash+a.margin.collateral);a.margin.collateral=0;a.margin.call=null;}}
+ function corporateExtras(a,id,inst,d,cb){
+  for(const div of inst.stockDividends||[])if(div.ex===d&&a.holdings[id]){
+   const h=a.holdings[id],p=a.margin?.positions[id],rawCash=(h.qty-(p?.qty||0))*div.ratio,rawMargin=(p?.qty||0)*div.ratio,cashQty=Math.floor(rawCash+1e-8),marginQty=Math.floor(rawMargin+1e-8),qty=cashQty+marginQty,cashClaimCost=money((h.cost-(p?.cost||0))*div.ratio/(1+div.ratio)),marginClaimCost=p?money(p.cost*div.ratio/(1+div.ratio)):0,marginCost=rawMargin?money(marginClaimCost*marginQty/rawMargin):0;
+   h.cost=money(h.cost-cashClaimCost-marginClaimCost);if(p)p.cost=money(p.cost-marginClaimCost);
+   a.receivables.push({kind:'stock',id,ex:div.ex,pay:div.pay,qty,cost:money((rawCash?money(cashClaimCost*cashQty/rawCash):0)+marginCost),fractionCash:Math.floor(Math.max(0,rawCash-cashQty)*div.fractionPrice+1e-8)+Math.floor(Math.max(0,rawMargin-marginQty)*div.fractionPrice+1e-8),amount:money(qty*(latest(id,d)?.[4]||0)),marginQty,marginCost,...(p?{marginEpoch:marginEpoch(a,p)}:{})});
+   positionAdjustment(a,id,cb,inst.name+' 除權，應收股票 '+qty+' 股；'+div.pay+' 發放後可交易');
+  }
+  for(const action of inst.capitalActions||[])if(action.date===d&&a.holdings[id]){
+   const h=a.holdings[id],p=a.margin?.positions[id],oldMargin=p?.qty||0,oldCash=h.qty-oldMargin,rawMargin=oldMargin*action.ratio,rawCash=oldCash*action.ratio,mq=Math.floor(rawMargin+1e-8),cq=Math.floor(rawCash+1e-8),cashCost=money(h.cost-(p?.cost||0)),cashAmount=money(oldCash*action.cashPerOldShare+Math.floor(Math.max(0,rawCash-cq)*action.fractionPrice+1e-8)),marginAmount=money(oldMargin*action.cashPerOldShare+Math.floor(Math.max(0,rawMargin-mq)*action.fractionPrice+1e-8));
+   const mc=rawMargin?money(Math.max(0,(p?.cost||0)-oldMargin*action.cashPerOldShare)*mq/rawMargin):0,cc=rawCash?money(Math.max(0,cashCost-oldCash*action.cashPerOldShare)*cq/rawCash):0;
+   a.receivables.push({kind:'capital',id,ex:d,pay:action.pay,amount:money(cashAmount+marginAmount),marginAmount,...(p?{marginEpoch:marginEpoch(a,p)}:{})});h.qty=mq+cq;h.cost=money(mc+cc);if(p){p.qty=mq;p.cost=mc;}if(!h.qty)delete a.holdings[id];
+   positionAdjustment(a,id,cb,inst.name+' 現金減資換股，持股換為 '+(mq+cq)+' 股；退還股款於 '+action.pay+' 入帳');
+  }
+ }
+ function settleClaim(a,r,d,cb){
+  if(r.kind==='stock'){
+   const h=a.holdings[r.id]||{qty:0,cost:0},p=a.margin?.positions[r.id];h.qty+=r.qty;h.cost=money(h.cost+r.cost);if(h.qty)a.holdings[r.id]=h;
+   if(p&&p.epoch===r.marginEpoch){p.qty+=r.marginQty;p.cost=money(p.cost+r.marginCost);}a.cash=money(a.cash+r.fractionCash);
+   positionAdjustment(a,r.id,cb,data.instruments[r.id].name+' 股票股利 '+r.qty+' 股入帳'+(r.fractionCash?'，畸零股現金 '+r.fractionCash+' 元':''));return r.fractionCash;
+  }
+  a.cash=money(a.cash+r.amount);
+  if(r.kind==='capital'){
+   const p=a.margin?.positions[r.id];if(p&&p.epoch===r.marginEpoch){const principal=p.qty?Math.min(p.principal,r.marginAmount):p.principal,interest=p.qty&&principal<p.principal?0:p.interest;a.cash=money(a.cash-principal-interest);p.principal=money(p.principal-principal);p.interest=money(p.interest-interest);a.margin.interestPaid=money(a.margin.interestPaid+interest);if(!p.principal)delete a.margin.positions[r.id];releaseCollateral(a);}
+   positionAdjustment(a,r.id,cb,data.instruments[r.id].name+' 減資退還股款入帳'+(r.marginAmount?'，融資退還部分優先還款':''));
+  }
+  return r.amount;
+ }
  function corporate(a,d,cb){
   for(const [id,inst] of Object.entries(data.instruments)){
+   corporateExtras(a,id,inst,d,cb);
    for(const sp of inst.splits||[])if(sp.date===d&&a.holdings[id]){a.holdings[id].qty*=sp.ratio;cb?.('split',`${inst.name} 1 拆 ${sp.ratio}，持股自動換發`);}
    for(const div of inst.dividends||[])if(div.ex===d&&a.holdings[id]){
     const amount=money(a.holdings[id].qty*div.amount);
@@ -40,7 +73,7 @@ function createMarket(data){
     a.receivables.push({id,ex:div.ex,pay:div.pay,amount});cb?.('dividend',`${inst.name} 除息，應收股利 ${amount.toLocaleString('zh-TW')} 元`);
    }
   }
-  let paid=0;a.receivables=a.receivables.filter(r=>{if(r.pay<=d){a.cash=money(a.cash+r.amount);paid+=r.amount;return false;}return true;});
+  let paid=0;a.receivables=a.receivables.filter(r=>{if(r.pay<=d){paid+=settleClaim(a,r,d,cb);return false;}return true;});
   if(paid)cb?.('dividend',`股利入帳 ${money(paid).toLocaleString('zh-TW')} 元`);return paid;
  }
  const startIndex=s=>data.calendar.indexOf(s.startDate||data.calendar[0]);
@@ -60,13 +93,13 @@ function createMarket(data){
  }
  function repaySkillLoans(s,all=false,atClose=false){if(!s.skills)return;const due=s.skills.loans.filter(l=>l.remaining>0&&(all||(l.kind==='mother'&&l.due<=date(s))||(l.kind==='vip'&&!Object.keys(s.margin?.positions||{}).length)));if(!due.length)return;const needed=money(due.reduce((n,l)=>n+l.remaining,0));if(s.cash<needed)sellForSkillDebt(s,needed,atClose);for(const l of due){const amount=l.remaining;l.remaining=0;s.cash=money(s.cash-amount);s.skills.totalRepaid=money(s.skills.totalRepaid+amount);record(s,'skill-repay',(l.kind==='mother'?'媽媽10塊':'VIP代墊')+'：'+(all?'本輪結算':'到期')+'還款 '+amount.toLocaleString('zh-TW')+' 元',{amount,kind:l.kind});if(s.cash<0&&!s.bankruptcyReason)s.bankruptcyReason=l.kind==='mother'?'mother-debt':'margin-debt';}}
  function enableMargin(s){if(s.status==='playing'&&!s.margin)s.margin={version:1,enabled:true,positions:{},collateral:0,totalBorrowed:0,totalInterest:0,interestPaid:0,totalTopups:0,liquidations:0,call:null};return s.margin;}
- function marginInfo(s,d=date(s)){const m=s.margin,positions=Object.entries(m?.positions||{}),principal=money(positions.reduce((n,[,p])=>n+p.principal,0)),interest=money(positions.reduce((n,[,p])=>n+p.interest,0)),value=money(positions.reduce((n,[id,p])=>n+p.qty*(latest(id,d)?.[4]||0),0)),collateral=m?.collateral||0;return {enabled:!!m?.enabled,principal,interest,value,collateral,maintenance:principal?(value+collateral)/principal*100:null,requiredTopup:principal?Math.max(0,Math.ceil((principal/.6-value-collateral)*100-1e-6)/100):0,call:m?.call||null,totalBorrowed:m?.totalBorrowed||0,totalInterest:m?.totalInterest||0,interestPaid:m?.interestPaid||0,totalTopups:m?.totalTopups||0,liquidations:m?.liquidations||0};}
+ function marginInfo(s,d=date(s)){const m=s.margin,positions=Object.entries(m?.positions||{}),principal=money(positions.reduce((n,[,p])=>n+p.principal,0)),interest=money(positions.reduce((n,[,p])=>n+p.interest,0)),value=money(positions.reduce((n,[id,p])=>n+p.qty*(latest(id,d)?.[4]||0),0)+marginClaimValue(s,d)),collateral=m?.collateral||0;return {enabled:!!m?.enabled,principal,interest,value,collateral,maintenance:principal?(value+collateral)/principal*100:null,requiredTopup:principal?Math.max(0,Math.ceil((principal/.6-value-collateral)*100-1e-6)/100):0,call:m?.call||null,totalBorrowed:m?.totalBorrowed||0,totalInterest:m?.totalInterest||0,interestPaid:m?.interestPaid||0,totalTopups:m?.totalTopups||0,liquidations:m?.liquidations||0};}
  function available(s,id,financing='cash'){return financing==='margin'?(s.margin?.positions[id]?.qty||0):(s.holdings[id]?.qty||0)-(s.margin?.positions[id]?.qty||0);}
  function marginAffordable(cash,price){if(!Number.isFinite(cash)||cash<=0||!Number.isFinite(price)||price<=0)return 0;let lo=0,hi=Math.min(100000000,Math.floor(cash/(price*.4)));while(lo<hi){const q=Math.ceil((lo+hi)/2),value=money(q*price),own=money(value-money(value*.6)+fee(value));if(own<=cash)lo=q;else hi=q-1;}return lo;}
  function marginFill(s,id,side,qty,price,forced=false){
   const m=s.margin;if(!m?.enabled)throw Error('融資尚未解鎖');if(!Number.isSafeInteger(qty)||qty<1||!Number.isFinite(price)||price<=0)throw Error('融資數量或價格不正確');
   const value=money(qty*price),commission=fee(value),tax=side==='sell'?Math.floor(value*(id==='0050'?.001:.003)):0,h=s.holdings[id]||{qty:0,cost:0},p=m.positions[id]||{qty:0,cost:0,principal:0,interest:0};let costBasis,realizedPnl,borrowed=0,repaid=0,interestPaid=0;
-  if(side==='buy'){if(m.call)throw Error('追繳期間不能新增融資');borrowed=money(value*.6);const own=money(value-borrowed+commission);if(own>s.cash)throw Error('開盤價格變動，融資自備款不足，委託未成交');s.cash=money(s.cash-own);h.qty+=qty;h.cost=money(h.cost+value+commission);p.qty+=qty;p.cost=money(p.cost+value+commission);p.principal=money(p.principal+borrowed);const firstDay=money(borrowed*MARGIN.annualRate/365);p.interest=money(p.interest+firstDay);m.totalInterest=money(m.totalInterest+firstDay);m.totalBorrowed=money(m.totalBorrowed+borrowed);s.holdings[id]=h;m.positions[id]=p;
+  if(side==='buy'){if(!p.epoch)marginEpoch(s,p);if(m.call)throw Error('追繳期間不能新增融資');borrowed=money(value*.6);const own=money(value-borrowed+commission);if(own>s.cash)throw Error('開盤價格變動，融資自備款不足，委託未成交');s.cash=money(s.cash-own);h.qty+=qty;h.cost=money(h.cost+value+commission);p.qty+=qty;p.cost=money(p.cost+value+commission);p.principal=money(p.principal+borrowed);const firstDay=money(borrowed*MARGIN.annualRate/365);p.interest=money(p.interest+firstDay);m.totalInterest=money(m.totalInterest+firstDay);m.totalBorrowed=money(m.totalBorrowed+borrowed);s.holdings[id]=h;m.positions[id]=p;
   }else if(side==='sell'){if(qty>p.qty)throw Error('融資持股不足');const ratio=qty/p.qty,stockCost=qty===p.qty?p.cost:money(p.cost*ratio);repaid=qty===p.qty?p.principal:money(p.principal*ratio);interestPaid=qty===p.qty?p.interest:money(p.interest*ratio);costBasis=money(stockCost+interestPaid);realizedPnl=money(value-commission-tax-costBasis);s.cash=money(s.cash+value-commission-tax-repaid-interestPaid);h.qty-=qty;h.cost=money(h.cost-stockCost);p.qty-=qty;p.cost=money(p.cost-stockCost);p.principal=money(p.principal-repaid);p.interest=money(p.interest-interestPaid);m.interestPaid=money(m.interestPaid+interestPaid);if(!p.qty)delete m.positions[id];if(!h.qty)delete s.holdings[id];if(!Object.keys(m.positions).length){s.cash=money(s.cash+m.collateral);m.collateral=0;m.call=null;}
   }else throw Error('未知交易方向');
   return {id,side,qty,price,value,fee:commission,tax,financing:'margin',borrowed,repaid,interestPaid,...(forced?{forced:true}:{}),...(side==='sell'?{costBasis,realizedPnl}:{})};
@@ -80,7 +113,7 @@ function createMarket(data){
  function marginNeedsAction(s){const c=s.margin?.call;return s.status==='playing'&&!!c&&marginInfo(s).maintenance<MARGIN.minimum&&c.ackDay!==s.day;}
  function acknowledgeMargin(s){if(!marginNeedsAction(s))throw Error('目前沒有待處理的追繳通知');s.margin.call.ackDay=s.day;record(s,'margin-response','追繳第 '+(s.day-s.margin.call.startedDay+1)+' 天：暫不補繳，繼續觀察；回升至 130% 可暫緩處分');}
  function topupMargin(s,amount){if(s.status!=='playing'||!s.margin?.call)throw Error('目前沒有融資追繳令');if(!Number.isFinite(amount)||amount<=0||money(amount)!==amount||amount>s.cash)throw Error('補繳金額須為可用現金內的正數，最多兩位小數');s.cash=money(s.cash-amount);s.margin.collateral=money(s.margin.collateral+amount);s.margin.totalTopups=money(s.margin.totalTopups+amount);s.margin.call.paidTopup=money((s.margin.call.paidTopup||0)+amount);record(s,'margin-topup','補繳融資保證金 '+amount.toLocaleString('zh-TW')+' 元');marginCheck(s);return marginInfo(s);}
- function liquidateMargin(s,atClose=false){const m=s.margin;if(!m||!Object.keys(m.positions).length)return;let sold=false;for(const[id,p]of Object.entries(m.positions)){const r=bar(id,date(s));if(!r){record(s,'margin-suspended',id+' 暫停交易，融資處分順延至可交易日');continue;}const t=marginFill(s,id,'sell',p.qty,r[atClose?4:1],true);record(s,'fill','融資斷頭：強制賣出 '+id+' '+t.qty.toLocaleString()+' 股',t);s.orders=s.orders.filter(o=>o.id!==id);sold=true;}if(sold)m.liquidations++;
+ function liquidateMargin(s,atClose=false){const m=s.margin;if(!m||!Object.keys(m.positions).length)return;let sold=false;for(const[id,p]of Object.entries(m.positions)){if(!p.qty)continue;const r=bar(id,date(s));if(!r){record(s,'margin-suspended',id+' 暫停交易，融資處分順延至可交易日');continue;}const t=marginFill(s,id,'sell',p.qty,r[atClose?4:1],true);record(s,'fill','融資斷頭：強制賣出 '+id+' '+t.qty.toLocaleString()+' 股',t);s.orders=s.orders.filter(o=>o.id!==id);sold=true;}if(sold)m.liquidations++;
   if(s.cash<0)for(const[id,h]of Object.entries(s.holdings)){const q=available(s,id),r=bar(id,date(s));if(!q||!r)continue;const t=fill(s,id,'sell',q,r[atClose?4:1]);record(s,'fill','融資清償：出售現股 '+id+' 補還款差額',{...t,forced:true});if(s.cash>=0)break;}
  }
  const canTrade=s=>s.status==='playing'&&!s.opening&&!s.activeEvent&&!s.supportGames?.some(g=>g.choice==='pending')&&(s.mode!=='life'||(!beforeStart(s)&&s.day<=s.life.until));
@@ -106,8 +139,8 @@ function createMarket(data){
  function next(s){
   if(s.status!=='playing')return false;if(s.activeEvent)throw Error('請先完成劇情選擇');if(marginNeedsAction(s))throw Error('請先處理今天的融資追繳通知');if(s.supportGames?.some(g=>g.choice==='pending'))throw Error('請先完成支撐線事件選擇');
   if(s.day>=data.calendar.length-1){finish(s);return false;}
-  const previous=date(s);s.day++;const d=date(s);accrueMargin(s,previous);corporate(s,d,(type,t)=>record(s,type,t));if(s.margin)for(const[id,p]of Object.entries(s.margin.positions))for(const sp of data.instruments[id].splits||[])if(sp.date===d)p.qty*=sp.ratio;
-  const call=s.margin?.call;if(call&&((call.disposeDay!==undefined&&s.day>=call.disposeDay)||(call.disposeDay===undefined&&!call.deferred&&s.day-call.startedDay>=3))){const info=marginInfo(s),openValue=Object.entries(s.margin.positions).reduce((n,[id,p])=>n+p.qty*(bar(id,d)?.[1]??latest(id,previous)?.[4]??0),0),openMaintenance=info.principal?(openValue+info.collateral)/info.principal*100:Infinity;
+  const previous=date(s);s.day++;const d=date(s);accrueMargin(s,previous);corporate(s,d,(type,t,extra)=>record(s,type,t,extra));if(s.margin)for(const[id,p]of Object.entries(s.margin.positions))for(const sp of data.instruments[id].splits||[])if(sp.date===d)p.qty*=sp.ratio;
+  const call=s.margin?.call;if(call&&((call.disposeDay!==undefined&&s.day>=call.disposeDay)||(call.disposeDay===undefined&&!call.deferred&&s.day-call.startedDay>=3))){const info=marginInfo(s),openValue=Object.entries(s.margin.positions).reduce((n,[id,p])=>n+p.qty*(bar(id,d)?.[1]??latest(id,previous)?.[4]??0),0)+marginClaimValue(s,d,true),openMaintenance=info.principal?(openValue+info.collateral)/info.principal*100:Infinity;
    if(openMaintenance+1e-8>=MARGIN.minimum){call.deferred=true;delete call.disposeDay;record(s,'margin-deferred','處分前維持率回到 130% 以上，暫緩處分、保留追繳紀錄');}else {for(const o of s.orders.filter(o=>o.financing==='margin'))record(s,'cancel','融資斷頭處分日，取消 '+o.id+' 融資委託',o);s.orders=s.orders.filter(o=>o.financing!=='margin');liquidateMargin(s);}}
   repaySkillLoans(s);
   const paid=corporate(s.benchmark,d);
@@ -154,8 +187,10 @@ function createMarket(data){
   if(!raw||raw.version!==VERSION)throw Error('存檔版本或資料範圍不相容');
   const extended=typeof raw.datasetEnd==='string'&&raw.datasetEnd<data.end&&data.calendar.includes(raw.datasetEnd),same=raw.datasetEnd===data.end;
   if(!same&&!extended)throw Error('存檔版本或資料範圍不相容');
-  if(extended&&(!raw.datasetPrefix||raw.datasetPrefix!==datasetStamp(raw.datasetEnd)))throw Error('舊存檔與已追加的歷史資料不相容');
-  if(same&&raw.datasetPrefix!==undefined&&raw.datasetPrefix!==datasetStamp(raw.datasetEnd))throw Error('存檔歷史資料已變更');
+  const legacy=raw.datasetPrefix!==datasetStamp(raw.datasetEnd)&&(data.legacyDatasets||[]).find(v=>raw.datasetPrefix===datasetStamp(raw.datasetEnd,v.instrumentIds));
+  if(legacy){const ids=[...Object.keys(raw.holdings||{}),...Object.keys(raw.benchmark?.holdings||{}),...(raw.orders||[]).map(o=>o.id),...(raw.receivables||[]).map(r=>r.id)];if(ids.some(id=>!legacy.instrumentIds.includes(id)))throw Error('舊存檔含有版本外的股票');}
+  if(extended&&(!raw.datasetPrefix||raw.datasetPrefix!==datasetStamp(raw.datasetEnd))&&!legacy)throw Error('舊存檔與已追加的歷史資料不相容');
+  if(same&&raw.datasetPrefix!==undefined&&raw.datasetPrefix!==datasetStamp(raw.datasetEnd)&&!legacy)throw Error('存檔歷史資料已變更');
   if(raw.mode!==undefined&&!['life','free'].includes(raw.mode))throw Error('存檔模式不正確');
   if(raw.mode==='life'){const l=raw.life;if(!l||!Number.isInteger(l.until)||!Number.isInteger(l.openedAt)||l.openedAt< -1||l.openedAt>raw.day||l.until< -1||l.until>=data.calendar.length||l.until>raw.day+2||!Number.isSafeInteger(l.windows)||l.windows<0||!(l.anchorId===null||typeof l.anchorId==='string'))throw Error('存檔操作期不正確');}
   if(raw.chats!==undefined&&(!Array.isArray(raw.chats)||raw.chats.length>250||!raw.chats.every(c=>c&&typeof c.id==='string'&&typeof c.eventId==='string'&&typeof c.date==='string'&&c.date<=date(raw)&&typeof c.title==='string'&&Array.isArray(c.messages)&&c.messages.length<=12&&c.messages.every(m=>m&&typeof m.speaker==='string'&&typeof m.text==='string'&&m.text.length<=500)&&Array.isArray(c.replies)&&c.replies.length<=4&&c.replies.every(r=>typeof r==='string')&&(c.reply===null||c.replies.includes(c.reply)))))throw Error('存檔群組紀錄不正確');
@@ -163,9 +198,10 @@ function createMarket(data){
   if(!['playing','won','lost','bankrupt','awaiting-data'].includes(raw.status))throw Error('存檔狀態不正確');
   function checkAccount(a){if(!a||!Number.isFinite(a.cash)||(a.cash<0&&!(a===raw&&raw.status==='bankrupt'&&(['margin-debt','mother-debt'].includes(raw.bankruptcyReason))&&(raw.margin?.totalBorrowed>0||raw.skills?.motherUsed>0||raw.skills?.vipUsed>0)))||!a.holdings||typeof a.holdings!=='object'||Array.isArray(a.holdings)||!Array.isArray(a.receivables))throw Error('存檔資產不正確');
    for(const[id,h]of Object.entries(a.holdings))if(!data.instruments[id]?.tradable||!Number.isSafeInteger(h.qty)||h.qty<=0||!Number.isFinite(h.cost)||h.cost<0)throw Error('存檔持股不正確');
-   for(const r of a.receivables)if(!data.instruments[r.id]||!Number.isFinite(r.amount)||r.amount<0||!/^\d{4}-\d{2}-\d{2}$/.test(r.pay))throw Error('存檔股利不正確');}
+   for(const r of a.receivables){if(r.marginEpoch!==undefined&&(!Number.isSafeInteger(r.marginEpoch)||r.marginEpoch<1))throw Error('存檔應收股票來源不正確');if(r.kind!==undefined&&!['stock','capital'].includes(r.kind))throw Error('存檔公司行動不正確');if(r.kind==='stock'&&(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.cost)||r.cost<0||!Number.isFinite(r.fractionCash)||r.fractionCash<0||!Number.isSafeInteger(r.marginQty)||r.marginQty<0||r.marginQty>r.qty||!Number.isFinite(r.marginCost)||r.marginCost<0||r.marginCost>r.cost+.01||!data.instruments[r.id]?.stockDividends?.some(d=>d.ex===r.ex&&d.pay===r.pay)))throw Error('存檔應收股票不正確');if(r.kind==='capital'&&(!Number.isFinite(r.marginAmount)||r.marginAmount<0||r.marginAmount>r.amount||!data.instruments[r.id]?.capitalActions?.some(d=>d.date===r.ex&&d.pay===r.pay)))throw Error('存檔減資股款不正確');if(!data.instruments[r.id]||!Number.isFinite(r.amount)||r.amount<0||!/^\d{4}-\d{2}-\d{2}$/.test(r.pay))throw Error('存檔股利不正確');}}
   checkAccount(raw);checkAccount(raw.benchmark);
-  if(raw.margin!==undefined){const m=raw.margin;if(!m||m.version!==1||m.enabled!==true||!m.positions||typeof m.positions!=='object'||Array.isArray(m.positions)||!['collateral','totalBorrowed','totalInterest','interestPaid','totalTopups'].every(k=>Number.isFinite(m[k])&&m[k]>=0)||!Number.isSafeInteger(m.liquidations)||m.liquidations<0||m.interestPaid>m.totalInterest+.01)throw Error('存檔融資帳戶不正確');for(const[id,p]of Object.entries(m.positions))if(!raw.holdings[id]||!Number.isSafeInteger(p.qty)||p.qty<=0||p.qty>raw.holdings[id].qty||!['cost','principal','interest'].every(k=>Number.isFinite(p[k])&&p[k]>=0)||p.principal<=0||p.cost>raw.holdings[id].cost+.01)throw Error('存檔融資持股不正確');if(m.call!==null&&(!m.call||!Number.isInteger(m.call.startedDay)||m.call.startedDay<0||m.call.startedDay>raw.day||!Number.isInteger(m.call.ackDay)||m.call.ackDay< -1||m.call.ackDay>raw.day||!Object.keys(m.positions).length))throw Error('存檔追繳令不正確');}
+  if(raw.margin!==undefined){const m=raw.margin;if(!m||m.version!==1||m.enabled!==true||!m.positions||typeof m.positions!=='object'||Array.isArray(m.positions)||!['collateral','totalBorrowed','totalInterest','interestPaid','totalTopups'].every(k=>Number.isFinite(m[k])&&m[k]>=0)||!Number.isSafeInteger(m.liquidations)||m.liquidations<0||m.interestPaid>m.totalInterest+.01)throw Error('存檔融資帳戶不正確');for(const[id,p]of Object.entries(m.positions))if((!raw.holdings[id]&&!raw.receivables.some(r=>r.kind==='capital'&&r.id===id&&r.marginEpoch===p.epoch))||!Number.isSafeInteger(p.qty)||p.qty<0||(p.qty===0&&!raw.receivables.some(r=>r.kind==='capital'&&r.id===id&&r.marginEpoch===p.epoch))||p.qty>(raw.holdings[id]?.qty||0)||!['cost','principal','interest'].every(k=>Number.isFinite(p[k])&&p[k]>=0)||p.principal<=0||p.cost>(raw.holdings[id]?.cost||0)+.01)throw Error('存檔融資持股不正確');if(m.call!==null&&(!m.call||!Number.isInteger(m.call.startedDay)||m.call.startedDay<0||m.call.startedDay>raw.day||!Number.isInteger(m.call.ackDay)||m.call.ackDay< -1||m.call.ackDay>raw.day||!Object.keys(m.positions).length))throw Error('存檔追繳令不正確');}
+  if(raw.margin){const m=raw.margin;if(m.positionSeq!==undefined&&(!Number.isSafeInteger(m.positionSeq)||m.positionSeq<0)||Object.values(m.positions).some(p=>p.epoch!==undefined&&(!Number.isSafeInteger(p.epoch)||p.epoch<1||p.epoch>m.positionSeq)))throw Error('存檔融資部位來源不正確');}
   const call=raw.margin?.call;if(call&&((call.deferred!==undefined&&typeof call.deferred!=='boolean')||(call.disposeDay!==undefined&&(!Number.isInteger(call.disposeDay)||call.disposeDay<call.startedDay||call.disposeDay>raw.day+1))||(call.noticeTopup!==undefined&&(!Number.isFinite(call.noticeTopup)||call.noticeTopup<0))||(call.paidTopup!==undefined&&(!Number.isFinite(call.paidTopup)||call.paidTopup<0))))throw Error('存檔追繳期限不正確');
   if(raw.bankruptcyReason!==undefined&&!['margin-debt','mother-debt'].includes(raw.bankruptcyReason))throw Error('存檔結局原因不正確');
   if(raw.skills?.levels?.calendar!==undefined&&(!Number.isInteger(raw.skills.levels.calendar)||raw.skills.levels.calendar<0||raw.skills.levels.calendar>5||!Number.isInteger(raw.skills.calendarUsed)||raw.skills.calendarUsed<0||raw.skills.calendarUsed>raw.skills.levels.calendar||(raw.dateJumps?.length||0)!==raw.skills.calendarUsed))throw Error('存檔日期跳躍次數不正確');
@@ -178,13 +214,13 @@ function createMarket(data){
   if(!Number.isFinite(raw.stress)||raw.stress<0||raw.stress>100||!Number.isFinite(raw.spent)||raw.spent<0||typeof raw.opening!=='boolean'||!(raw.activeEvent===null||typeof raw.activeEvent==='string'))throw Error('存檔劇情不正確');
   if(!raw.history.every(h=>h&&typeof h.date==='string'&&Number.isFinite(h.player)&&Number.isFinite(h.benchmark))||raw.history.length!==raw.day-begin+2)throw Error('存檔績效不正確');
   if(raw.customStartDate&&raw.history.some((h,i)=>h.date!==(i===0?(begin?data.calendar[begin-1]:'2019-12-31'):data.calendar[begin+i-1])))throw Error('自訂輪次的交易日順序不正確');
-  const result=JSON.parse(JSON.stringify(raw));
+  const result=JSON.parse(JSON.stringify(raw));if(legacy){result.datasetPrefix=datasetStamp(raw.datasetEnd);result.expandedFrom=legacy.editionId;}
   if(extended){if(raw.history.some((h,i)=>h.date!==(i===0?(begin?data.calendar[begin-1]:'2019-12-31'):data.calendar[begin+i-1])))throw Error('存檔交易日順序不相容');result.datasetEnd=data.end;result.datasetPrefix=datasetStamp(data.end);if(['won','lost','awaiting-data'].includes(raw.status)&&raw.day===data.calendar.indexOf(raw.datasetEnd)){result.extendedFrom={date:raw.datasetEnd,status:raw.status};if(raw.runId){result.rewardRootId=raw.rewardRootId||raw.runId;result.parentRunId=raw.runId;delete result.runId;}result.status='playing';if(result.mode==='life')openWindow(result,'extended-'+raw.datasetEnd);}}
   return result;
  }
  function visibleRows(s,id){return data.instruments[id].rows.filter(r=>r[0]<=date(s));}
  function chipCutoff(s){return s.day<=0?'2019-12-31':data.calendar[s.day-1];}
- return {data,date,bar,latest,startIndex,beforeStart,sessions,fastForward,jumpDate,datasetStamp,stamp,equity,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend,canTrade,openWindow,migrateLegacy,enableMargin,enableSkills,skillInfo,borrowMother,useVIP,divine,marginInfo,marginAffordable,available,topupMargin,marginNeedsAction,acknowledgeMargin};
+ return {data,date,bar,latest,startIndex,beforeStart,sessions,fastForward,jumpDate,datasetStamp,stamp,equity,receivableValue,affordable,fresh,queue,cancel,next,choose,trigger,validate,visibleRows,chipCutoff,record,finish,spend,canTrade,openWindow,migrateLegacy,enableMargin,enableSkills,skillInfo,borrowMother,useVIP,divine,marginInfo,marginAffordable,available,topupMargin,marginNeedsAction,acknowledgeMargin};
 }
 root.TaiguEngine={createMarket,fee,money,INITIAL,VERSION,MARGIN};
 })(globalThis);

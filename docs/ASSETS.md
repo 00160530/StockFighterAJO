@@ -84,3 +84,6 @@ assets/support-hand-reference.webp 取代上一版手部。以使用者提供的
 - 工具：內建 imagegen，依使用者提供的粗線條貼圖參考生成單張 5×2 圖集，再以 WebP 編碼供網頁載入；保留透明背景。
 - 網頁素材：`assets/xiaojiu-moods-flat-1-10.webp`。原尺寸 PNG 隨本次工作成果提供，編號由介面顯示。
 - 最終提示詞：Create a 5×2 transparent emote sprite atlas in very simplified flat doodle chibi meme sticker style: thick near-black outlines, brown short messy hair, round glasses, green eyes, green leek hairclip, white office shirt with sage tie. Ten moods in order: calm smile, happy arms raised, smug half-lidded arms crossed, determined frown, nervous sweat, surprised, crying, tired chin in hand, grumpy pout, hopeful hands clasped. Huge simple head and tiny shoulders, flat fills, no detailed hair strands, no text, no scenery, neutral color balance without yellow-orange or blue tint.
+
+
+2026-10-18：小小韭六表情採核可預覽 v9、認真立繪 v3、十種心情頭像 v2。原 PNG 直接轉為無損 WebP，尺寸及 RGBA 逐像素驗證完全相同，未調整造型、分格、位置或顏色。對應 assets/characters/xiaoxiaojiu/ 的 expressions.webp、serious.webp、moods.webp。

@@ -42,3 +42,39 @@ test('feedback is authenticated, bounded, idempotent and private; no game save i
 test('feedback limit is enforced server-side without blocking leaderboard reads',async()=>{const a=setup(),who=(await a.call('/v1/players',{})).data;for(let i=0;i<5;i++)assert.equal((await a.call('/v1/feedback',{requestId:crypto.randomUUID(),kind:'wish',title:'增加劇情',body:'希望有更多群組故事。',version:'0.10.0',context:null},who.playerToken)).status,200);assert.equal((await a.call('/v1/feedback',{requestId:crypto.randomUUID(),kind:'wish',title:'增加劇情',body:'希望有更多群組故事。',version:'0.10.0',context:null},who.playerToken)).status,429);assert.equal((await a.call('/v1/leaderboard')).status,200);});
 test('public leaderboard caps at 100 while own-rank query still returns a lower position without exposing player credentials',async()=>{const a=setup(),{who,s}=await start(a);await a.call('/v1/scores',score(s),who.playerToken);const edition=EDITION.id+':tw-life-v1';for(let i=0;i<101;i++){const id='seed-'+i;a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run(id,id,1);a.DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(id,id,id,id,'life',edition,1,9999999999);a.DB.db.prepare('INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,highlights,submitted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,id,id,edition,'life','排行測試','won',100000+i,1600000000+i,EDITION.benchmarkCents,10,2,'{"maxGain":null,"maxLoss":null}',1);a.DB.db.prepare('INSERT INTO sf_best_scores(player_id,edition,metric,run_id,value,drawdown_bps,trades,submitted_at) VALUES (?,?,?,?,?,?,?,?)').run(id,edition,'alpha',id,100000+i,10,2,1);}const board=await a.call('/v1/leaderboard?mode=life');assert.equal(board.data.items.length,100);assert.equal(board.data.items[0].score,100100);assert.equal((await a.call('/v1/rank?mode=life',null,who.playerToken)).data.entry.rank,102);const snapshot=(await a.call('/v1/boards',null,who.playerToken)).data;assert.equal(snapshot.boards.life.won.items.length,100);assert.equal(snapshot.boards.life.won.entry.rank,102);assert.deepEqual(snapshot.boards.life.won.items,board.data.items);assert.equal(snapshot.boards.free.lost.entry,null);for(const r of board.data.items)for(const key of ['player_id','token_hash','sessionToken','playerToken'])assert.ok(!(key in r));});
 test('losing boards rank final assets then loss amount, merge old margin editions, and a tied benchmark belongs to the losing board',async()=>{const a=setup(),one=await start(a),two=await start(a),b=score(one.s,500000000),d={...score(two.s,500000000),maxLoss:{symbol:'0050',date:'2021-01-04',qty:1000,priceCents:12400,pnlCents:-200000,costBasisCents:12600000}};assert.equal((await a.call('/v1/scores',b,one.who.playerToken)).status,200);assert.equal((await a.call('/v1/scores',d,two.who.playerToken)).status,200);a.DB.db.prepare("UPDATE sf_runs SET edition=edition||':margin-v1',financing=1 WHERE player_id=?").run(two.who.playerId);const rows=(await a.call('/v1/leaderboard?outcome=lost')).data.items;assert.equal(rows.length,2);assert.equal(rows[0].lossCents,-200000);assert.equal(rows[0].financing,'margin');const equal=await start(a);await a.call('/v1/scores',score(equal.s,EDITION.benchmarkCents),equal.who.playerToken);assert.equal((await a.call('/v1/leaderboard?outcome=won')).data.items.length,0);assert.equal((await a.call('/v1/leaderboard?outcome=lost')).data.items[0].equityCents,EDITION.benchmarkCents);});
+
+
+test('nickname locks only after a valid first score and is shared across modes',async()=>{
+ const a=setup(),first=await start(a),token=first.who.playerToken;
+ assert.equal((await a.call('/v1/profile',null,token)).data.nickname,null);
+ assert.equal((await a.call('/v1/profile')).status,401);
+ const invalid={...score(first.s),nickname:'第一個名字',score:1.5};
+ assert.equal((await a.call('/v1/scores',invalid,token)).status,400);
+ assert.equal((await a.call('/v1/profile',null,token)).data.nickname,null);
+ const submitted=await a.call('/v1/scores',{...score(first.s),nickname:'第一個名字'},token);
+ assert.equal(submitted.status,200);assert.equal(submitted.data.nickname,'第一個名字');
+ const second=await start(a,first.who,'free');
+ const changed=await a.call('/v1/scores',{...score(second.s),nickname:'另一個名字'},token);
+ assert.equal(changed.status,409);assert.equal(changed.data.error.code,'NICKNAME_LOCKED');assert.equal(changed.data.error.nickname,'第一個名字');
+ assert.equal(a.DB.db.prepare('SELECT used_at FROM sf_sessions WHERE id=?').get(second.s.sessionId).used_at,null);
+ assert.equal((await a.call('/v1/scores',{...score(second.s),nickname:'第一個名字'},token)).status,200);
+ assert.equal((await a.call('/v1/profile',null,token)).data.nickname,'第一個名字');
+ assert.equal(a.DB.db.prepare('SELECT COUNT(DISTINCT nickname) AS n FROM sf_runs').get().n,1);
+});
+test('automatic life completion does not reserve the placeholder nickname',async()=>{
+ const a=setup(),{who,s}=await start(a);
+ assert.equal((await a.call('/v1/completions',{...score(s),nickname:'小韭'},who.playerToken)).status,200);
+ assert.equal((await a.call('/v1/profile',null,who.playerToken)).data.nickname,null);
+ assert.equal((await a.call('/v1/scores',{...score(s),nickname:'自己選的名字'},who.playerToken)).status,200);
+});
+test('concurrent different first names cannot both submit and the losing session stays usable',async()=>{
+ const a=setup(),first=await start(a),second=await start(a,first.who),token=first.who.playerToken;
+ const entries=[[first.s,'先來小韭'],[second.s,'後來小韭']];
+ const responses=await Promise.all(entries.map(([s,nickname])=>a.call('/v1/scores',{...score(s),nickname},token)));
+ assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+ const winner=(await a.call('/v1/profile',null,token)).data.nickname,loser=responses.findIndex(r=>r.status===409);
+ assert.equal(responses[loser].data.error.code,'NICKNAME_LOCKED');
+ assert.equal(a.DB.db.prepare('SELECT used_at FROM sf_sessions WHERE id=?').get(entries[loser][0].sessionId).used_at,null);
+ assert.equal((await a.call('/v1/scores',{...score(entries[loser][0]),nickname:winner},token)).status,200);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(DISTINCT nickname) AS n FROM sf_runs').get().n,1);
+});

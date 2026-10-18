@@ -6,6 +6,10 @@ function tradeStats(data,log){
  const holdings={},sales=[];let buys=0,sells=0,fees=0,tax=0,complete=true,splitIndex=0,lastDate='';
  const splits=Object.entries(data.instruments).flatMap(([id,inst])=>(inst.splits||[]).map(sp=>({...sp,id}))).sort((a,b)=>a.date.localeCompare(b.date));
  for(const l of log){
+  if(l.type==='position-adjust'){
+   if(!data.instruments[l.id]?.tradable||!['cashQty','marginQty'].every(k=>Number.isSafeInteger(l[k])&&l[k]>=0)||!['cashCost','marginCost'].every(k=>Number.isFinite(l[k])&&l[k]>=0)){complete=false;continue;}
+   for(const [key,qty,cost]of [[l.id,l.cashQty,l.cashCost],[l.id+':margin',l.marginQty,l.marginCost]]){if(qty)holdings[key]={qty,cost};else delete holdings[key];}continue;
+  }
   if(l.type!=='fill')continue;
   if(!data.instruments[l.id]?.tradable||!['buy','sell'].includes(l.side)||!Number.isSafeInteger(l.qty)||l.qty<1||!['price','value','fee','tax'].every(k=>Number.isFinite(l[k])&&l[k]>=0)||l.price<=0||!/^\d{4}-\d{2}-\d{2}$/.test(l.date)||l.date<lastDate){complete=false;continue;}
   lastDate=l.date;while(splitIndex<splits.length&&splits[splitIndex].date<=l.date){const sp=splits[splitIndex++];for(const key of [sp.id,sp.id+':margin'])if(holdings[key])holdings[key].qty*=sp.ratio;}
@@ -30,10 +34,10 @@ function inventory(market,s){
  const date=market.date(s),rows=Object.entries(s.holdings).map(([id,h])=>{
   const inst=market.data.instruments[id],priceBar=market.latest(id,date),price=priceBar?.[4]||0,value=money(price*h.qty),pnl=money(value-h.cost);
   const trades=s.log.filter(l=>l.type==='fill'&&l.id===id&&l.date<=date),splits=(inst.splits||[]).filter(sp=>sp.date<=date).slice().sort((a,b)=>a.date.localeCompare(b.date));let qty=0,firstBuy=null,lastBuy=null,si=0;
-  for(const t of trades){while(si<splits.length&&splits[si].date<=t.date)qty*=splits[si++].ratio;if(t.side==='buy'){if(!qty)firstBuy=t.date;lastBuy=t.date;qty+=t.qty;}else{qty-=t.qty;if(qty<=0){qty=0;firstBuy=null;lastBuy=null;}}}
+  for(const t of s.log.filter(l=>l.id===id&&l.date<=date&&['fill','position-adjust'].includes(l.type))){while(si<splits.length&&splits[si].date<=t.date)qty*=splits[si++].ratio;if(t.type==='position-adjust'){const adjusted=t.cashQty+t.marginQty;if(!qty&&adjusted)firstBuy=t.date;qty=adjusted;if(!qty){firstBuy=null;lastBuy=null;}}else if(t.side==='buy'){if(!qty)firstBuy=t.date;lastBuy=t.date;qty+=t.qty;}else{qty-=t.qty;if(qty<=0){qty=0;firstBuy=null;lastBuy=null;}}}
   const credit=s.margin?.positions[id];return {id,name:inst.name,qty:h.qty,cost:h.cost,average:h.cost/h.qty,price,priceDate:priceBar?.[0],value,pnl,returnPct:h.cost?pnl/h.cost*100:0,firstBuy,lastBuy,trades,marginQty:credit?.qty||0,cashQty:h.qty-(credit?.qty||0),principal:credit?.principal||0,interest:credit?.interest||0};
  });
- const cost=money(rows.reduce((n,r)=>n+r.cost,0)),value=money(rows.reduce((n,r)=>n+r.value,0)),pnl=money(value-cost),receivable=money(s.receivables.reduce((n,r)=>n+r.amount,0));
+ const cost=money(rows.reduce((n,r)=>n+r.cost,0)),value=money(rows.reduce((n,r)=>n+r.value,0)),pnl=money(value-cost),receivable=money(market.receivableValue(s,date));
  return {date,rows,cost,value,pnl,returnPct:cost?pnl/cost*100:0,cash:s.cash,receivable,equity:market.equity(s,date)};
 }
 function validJourney(r){const iso=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;return (r?.dateJumps===undefined||Array.isArray(r.dateJumps)&&r.dateJumps.length<=5&&r.dateJumps.every((j,i,a)=>j&&iso(j.from)&&iso(j.to)&&j.from>=(r.startDate||'2020-01-02')&&j.to>j.from&&j.to<=r.date&&(!i||j.from>=a[i-1].to)))&&(r?.startDate===undefined||iso(r.startDate))&&(r?.customStartDate==null||iso(r.customStartDate)&&r.customStartDate===r.startDate)&&(r?.earlySettlementDate==null||iso(r.earlySettlementDate)&&r.earlySettlementDate>=(r.startDate||'2020-01-02')&&r.earlySettlementDate<=r.date);}

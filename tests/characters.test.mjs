@@ -6,7 +6,7 @@ test('both characters load all six existing prologue scenes with the current art
  for(const id of ['xiaojiu','xiaoxiaojiu']){
   for(const field of ['sheet','serious','moods']){
    const asset=c.get(id)[field];
-   assert.ok(asset.endsWith('?v=0.14.2'));
+   assert.ok(asset.endsWith(id==='xiaoxiaojiu'?'?v=0.16.0':'?v=0.14.2'));
    assert.ok(fs.existsSync(new URL('../'+asset,import.meta.url)));
   }
   for(let i=1;i<=6;i++){

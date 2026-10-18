@@ -20,3 +20,23 @@ test('opening fetches all boards and own ranks once; mode, outcome and short reo
 test('board cache expires after five minutes, explicit refresh and identity change invalidate it',async()=>{let now=1000,count=0;const store=storage(),client=new Client({config,storage:store,now:()=>now,fetcher:async()=>{count++;return Response.json(snapshot());}});await client.boards();now+=299999;await client.boards();assert.equal(count,1);now++;await client.boards();assert.equal(count,2);client.invalidateBoards();await client.boards();assert.equal(count,3);store.setItem(KEY,JSON.stringify({version:1,sessions:{},receipts:{},player:{playerToken:'a'.repeat(64)}}));await client.boards();assert.equal(count,4);});
 test('failed board reads retry without caching errors; stale inflight reads cannot replace a newer snapshot',async()=>{let resolveOld,count=0;const client=new Client({config,storage:storage(),fetcher:async()=>{count++;if(count===1)throw Error('offline');if(count===2)return new Promise(resolve=>resolveOld=()=>resolve(Response.json({...snapshot(),tag:'old'})));return Response.json({...snapshot(),tag:'new'});}});await assert.rejects(client.boards());const old=client.boards();client.invalidateBoards();assert.equal((await client.boards()).tag,'new');resolveOld();await old;assert.equal((await client.boards()).tag,'new');assert.equal(count,3);});
 test('submitting a score invalidates previously fetched boards',async()=>{const a=stub();let reads=0;const client=new Client({config,storage:storage(),now:()=>1000,fetcher:(url,options)=>url.endsWith('/v1/boards')?(reads++,Promise.resolve(Response.json(snapshot()))):a.fetcher(url,options)});await client.start({runId:summary.id,mode:'life',day:-1,status:'playing'});await client.boards();await client.submit(summary,'小韭');await client.boards();assert.equal(reads,2);});
+
+
+test('profile reads deduplicate, recover the fixed server name and keep identities separate',async()=>{
+ const a=stub(),store=storage();let profiles=0;
+ const client=new Client({config,storage:store,fetcher:(url,options)=>url.endsWith('/v1/profile')?(profiles++,Promise.resolve(Response.json({nickname:'第一個名字'}))):a.fetcher(url,options)});
+ await Promise.all([client.profile(),client.profile()]);await client.profile();assert.equal(profiles,1);assert.equal(client.read().lockedNickname,'第一個名字');
+ const saved=client.read();saved.player.playerToken='c'.repeat(64);client.write(saved);await client.profile();assert.equal(profiles,2);
+});
+test('a successful first submit fixes the nickname and blocks later changes without another API request',async()=>{
+ const a=stub(),client=new Client({config,storage:storage(),fetcher:a.fetcher,now:()=>1000});
+ await client.start({runId:summary.id,mode:'life',day:-1,status:'playing'});await client.submit(summary,'第一次名字');
+ assert.equal(client.read().lockedNickname,'第一次名字');
+ await assert.rejects(client.submit({...summary,id:'second'},'換個名字'),e=>e.code==='NICKNAME_LOCKED');
+ assert.equal(a.calls.filter(c=>c.url.endsWith('/v1/scores')).length,1);
+});
+test('server nickname conflicts restore the canonical name without consuming a local receipt',async()=>{
+ const a=stub(),client=new Client({config,storage:storage(),now:()=>1000,fetcher:(url,options)=>url.endsWith('/v1/scores')?Promise.resolve(Response.json({error:{code:'NICKNAME_LOCKED',message:'名字已固定',nickname:'原來名字'}},{status:409})):a.fetcher(url,options)});
+ await client.start({runId:summary.id,mode:'life',day:-1,status:'playing'});await assert.rejects(client.submit(summary,'換名字'),e=>e.code==='NICKNAME_LOCKED');
+ assert.equal(client.read().lockedNickname,'原來名字');assert.equal(client.receipt(summary.id),null);
+});

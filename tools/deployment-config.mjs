@@ -20,7 +20,7 @@ export function readConfig(file){
 export function serializeConfig(config){return 'window.TAIGU_ONLINE_CONFIG = '+JSON.stringify(config,null,2).replaceAll('<','\\u003c')+';\n';}
 export function publicConfig(config,overrides={}){
  // Only these public fields may enter the browser. Never copy environment objects.
- return {apiBase:apiBase(overrides.apiBase??config.apiBase??''),editionId:config.editionId,datasetId:config.datasetId,version:config.version,repositoryUrl:repositoryUrl(overrides.repositoryUrl??config.repositoryUrl??'')};
+ return {...(Array.isArray(config.compatibleEditionIds)&&config.compatibleEditionIds.length?{compatibleEditionIds:config.compatibleEditionIds.filter(id=>typeof id==='string'&&/^tw-[a-zA-Z0-9-]{1,100}$/.test(id)).slice(0,20)}:{}),apiBase:apiBase(overrides.apiBase??config.apiBase??''),editionId:config.editionId,datasetId:config.datasetId,version:config.version,repositoryUrl:repositoryUrl(overrides.repositoryUrl??config.repositoryUrl??'')};
 }
 export function resolveConfig(root,env=process.env){
  const source=readConfig(path.join(root,'data/online-config.js')),localFile=path.join(root,'data/online-config.local.js');

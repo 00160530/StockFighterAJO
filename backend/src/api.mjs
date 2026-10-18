@@ -10,7 +10,8 @@ const stmt=(env,sql,...args)=>env.DB.prepare(sql).bind(...args);
 const all=async q=>(await q.all()).results;
 const mode=v=>{if(!['life','free'].includes(v))fail(400,'INVALID_MODE','請選擇有效的遊戲模式。');return v;};
 const finance=v=>{v=v||'cash';if(!['cash','margin'].includes(v))fail(400,'INVALID_FINANCING','排行榜交易方式不正確。');return v;};
-const editionFor=(m,f='cash')=>EDITION.id+':'+EDITION.rulesets[mode(m)]+(finance(f)==='margin'?':margin-v1':'');
+const supportedEditions=[EDITION.id,...(EDITION.compatibleEditionIds||[])];
+const editionFor=(m,f='cash',id=EDITION.id)=>id+':'+EDITION.rulesets[mode(m)]+(finance(f)==='margin'?':margin-v1':'');
 const scoreValue=(r,metric)=>metric==='alpha'?r.score:metric==='gain'?r.gain_cents:-(r.loss_cents??0);
 function bestInsert(env,runId,metric){const value=metric==='alpha'?'score':metric==='gain'?'gain_cents':'-loss_cents';return stmt(env,`INSERT INTO sf_best_scores(player_id,edition,metric,run_id,value,drawdown_bps,trades,submitted_at)
  SELECT player_id,edition,?,id,${value},drawdown_bps,trades,submitted_at FROM sf_runs WHERE id=? AND hidden=0 ${metric==='alpha'?'':metric==='gain'?'AND gain_cents>0':'AND loss_cents<0'}
@@ -22,27 +23,27 @@ function publicRow(row){return {startDate:row.start_date||EDITION.start,earlySet
 function boardOutcome(url){const v=url.searchParams.get('outcome')||(url.searchParams.get('metric')==='loss'?'lost':'won');if(!['won','lost'].includes(v))fail(400,'INVALID_OUTCOME','請選擇贏過大盤或未贏大盤。');if(url.searchParams.has('financing'))finance(url.searchParams.get('financing'));return v;}
 // One snapshot query ranks all four boards and includes the caller even below 100.
 async function boardSnapshot(env,playerId=null){
- const life=editionFor('life'),free=editionFor('free');
+ const family=m=>supportedEditions.flatMap(id=>[editionFor(m,'cash',id),editionFor(m,'margin',id)]),life=family('life'),free=family('free'),slots=life.map(()=>'?').join(',');
  const tie="equity_cents DESC,CASE WHEN outcome='lost' THEN COALESCE(-loss_cents,0) ELSE COALESCE(gain_cents,0) END DESC,trades ASC,submitted_at ASC,id ASC";
  const rows=await all(stmt(env,`WITH candidates AS (
   SELECT r.*,ROW_NUMBER() OVER(PARTITION BY mode,outcome,player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
   WHERE hidden=0 AND outcome IN ('won','lost') AND
-   ((mode='life' AND edition IN (?,?)) OR (mode='free' AND edition IN (?,?)))
+   ((mode='life' AND edition IN (${slots})) OR (mode='free' AND edition IN (${slots})))
  ), ranked AS (
   SELECT *,ROW_NUMBER() OVER(PARTITION BY mode,outcome ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1
- ) SELECT * FROM ranked WHERE rank<=100 OR player_id=? ORDER BY mode,outcome,rank`,life,life+':margin-v1',free,free+':margin-v1',playerId));
+ ) SELECT * FROM ranked WHERE rank<=100 OR player_id=? ORDER BY mode,outcome,rank`,...life,...free,playerId));
  const boards={life:{won:{items:[],entry:null},lost:{items:[],entry:null}},free:{won:{items:[],entry:null},lost:{items:[],entry:null}}};
  for(const row of rows){const b=boards[row.mode][row.outcome],item=publicRow(row);if(row.rank<=100)b.items.push(item);if(playerId&&row.player_id===playerId)b.entry=item;}
  return boards;
 }
 async function ranking(env,m,outcome='won',playerId=null){
- const edition=editionFor(m);if(!['won','lost'].includes(outcome))fail(400,'INVALID_OUTCOME','排行榜分類不正確。');
+ const editions=supportedEditions.flatMap(id=>[editionFor(m,'cash',id),editionFor(m,'margin',id)]),slots=editions.map(()=>'?').join(',');if(!['won','lost'].includes(outcome))fail(400,'INVALID_OUTCOME','排行榜分類不正確。');
  const tie='equity_cents DESC,'+(outcome==='lost'?'COALESCE(-loss_cents,0)':'COALESCE(gain_cents,0)')+' DESC,trades ASC,submitted_at ASC,id ASC';
  const rows=await all(stmt(env,`WITH candidates AS (
   SELECT r.*,ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
-  WHERE edition IN (?,?) AND mode=? AND outcome=? AND hidden=0
+  WHERE edition IN (${slots}) AND mode=? AND outcome=? AND hidden=0
  ), ranked AS (SELECT *,ROW_NUMBER() OVER(ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1)
- SELECT * FROM ranked ${playerId?'WHERE player_id=?':'ORDER BY rank LIMIT 100'}`,edition,edition+':margin-v1',m,outcome,...(playerId?[playerId]:[])));
+ SELECT * FROM ranked ${playerId?'WHERE player_id=?':'ORDER BY rank LIMIT 100'}`,...editions,m,outcome,...(playerId?[playerId]:[])));
  return playerId?(rows[0]?publicRow(rows[0]):null):rows.map(publicRow);
 }
 function highlight(raw,sign){if(raw===null)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_HIGHLIGHT','交易高光不正確。');exactKeys(raw,['symbol','date','qty','priceCents','pnlCents','costBasisCents']);if(raw.costBasisCents!==undefined){integer(raw.costBasisCents,1,EDITION.maxEquityCents,'交易成本');const proceeds=raw.costBasisCents+raw.pnlCents;if(!Number.isSafeInteger(proceeds)||proceeds<0||proceeds>raw.priceCents*raw.qty)fail(400,'INVALID_HIGHLIGHT','交易成本與損益不一致。');}if(!EDITION.symbols.some(s=>s.id===raw.symbol)||typeof raw.date!=='string'||raw.date<EDITION.start||raw.date>EDITION.datasetEnd||!/^\d{4}-\d{2}-\d{2}$/.test(raw.date))fail(400,'INVALID_HIGHLIGHT','高光的標的或日期不正確。');integer(raw.qty,1,100000000*4,'高光股數');integer(raw.priceCents,1,100000000,'高光價格');integer(raw.pnlCents,-EDITION.maxEquityCents,EDITION.maxEquityCents,'高光損益');if(raw.pnlCents*sign<=0)fail(400,'INVALID_HIGHLIGHT','高光損益方向不正確。');return raw;}
@@ -64,7 +65,7 @@ function journey(body,session){
 export function validateScore(body,session,now){
  exactKeys(body,['sessionId','sessionToken','nickname','editionId','mode','outcome','date','sessions','score','equityCents','benchmarkCents','drawdownBps','trades','buyTrades','sellTrades','maxGain','maxLoss','margin','playTimeMs','playTimePartial','skillUses','avatarId','avatarCharacter','startDate','customStartDate','earlySettlementDate','dateJumps']);
  const dates=journey(body,session);
- if(body.editionId!==EDITION.id||session.edition!==editionFor(body.mode)||session.mode!==body.mode)fail(400,'EDITION_MISMATCH','這輪的模式或行情版本不相容。');
+ if(!supportedEditions.includes(body.editionId)||session.mode!==body.mode||!(session.edition===editionFor(body.mode,'cash',body.editionId)||body.editionId===EDITION.id&&supportedEditions.some(id=>session.edition===editionFor(body.mode,'cash',id))))fail(400,'EDITION_MISMATCH','這輪的模式或行情版本不相容。');
  if(body.date!==EDITION.datasetEnd||body.sessions!==dates.sessions)fail(400,'INCOMPLETE_RUN','只有走到行情終點的完整輪次可以提交。');
  const equity=integer(body.equityCents,1,EDITION.maxEquityCents,'總資產'),benchmark=integer(body.benchmarkCents,1,Number.MAX_SAFE_INTEGER,'0050 基準');if(benchmark!==dates.benchmarkCents)fail(400,'BENCHMARK_MISMATCH','0050 基準不符合這個資料版本。');
  const score=integer(body.score,Math.round((1-benchmark)/10000),Math.round((EDITION.maxEquityCents-benchmark)/10000),'分數');if(score!==Math.round((equity-benchmark)/10000))fail(400,'SCORE_MISMATCH','分數與總資產不一致。');
@@ -83,16 +84,18 @@ async function submit(request,env,body,now,ip){
  const tokenHash=await hash(body.sessionToken),session=await stmt(env,'SELECT * FROM sf_sessions WHERE id=? AND player_id=? AND token_hash=?',body.sessionId,playerId,tokenHash).first();if(!session)fail(401,'SESSION_INVALID','這輪沒有有效的線上 Session。');
  if(session.used_at!==null){const prior=await stmt(env,'SELECT outcome FROM sf_runs WHERE session_id=?',session.id).first();fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:{rank:await ranking(env,session.mode,prior?.outcome||'won',playerId),submitted:true}});}
  if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','這輪的線上 Session 已到期，本機紀錄仍會保留。');
- const r=validateScore(body,session,now),id=crypto.randomUUID();
+ const r=validateScore(body,session,now),id=crypto.randomUUID(),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();
+ if(profile?.nickname&&profile.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:profile.nickname});
  const results=await env.DB.batch([
-  stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>?',now,id,session.id,playerId,tokenHash,now),
+  stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>? AND EXISTS (SELECT 1 FROM sf_players p WHERE p.id=sf_sessions.player_id AND (p.nickname IS NULL OR p.nickname=?))',now,id,session.id,playerId,tokenHash,now,r.nickname),
+  stmt(env,'UPDATE sf_players SET nickname=? WHERE id=? AND nickname IS NULL AND EXISTS (SELECT 1 FROM sf_sessions WHERE id=? AND submission_id=?)',r.nickname,playerId,session.id,id),
   stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps)
-   SELECT ?,id,player_id,edition || ?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,r.financing?':margin-v1':'',r.nickname,r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.avatarId,r.avatarCharacter,r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),session.id,id),
+   SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),r.nickname,r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.avatarId,r.avatarCharacter,r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),session.id,id),
   stmt(env,"INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at) SELECT session_id,player_id,outcome,submitted_at FROM sf_runs WHERE id=? AND mode='life'",id),
    ...METRICS.map(metric=>bestInsert(env,id,metric))
  ]);
- if(!results[1].meta.changes)fail(409,'SESSION_USED','這輪已提交過成績。');
- return {submitted:true,runId:id,rank:await ranking(env,session.mode,r.outcome,playerId),verification:'basic'};
+ if(!results[2].meta.changes){const current=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();if(current?.nickname&&current.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:current.nickname});fail(409,'SESSION_USED','這輪已提交過成績。');}
+ return {submitted:true,runId:id,nickname:r.nickname,rank:await ranking(env,session.mode,r.outcome,playerId),verification:'basic'};
 }
 async function feedback(request,env,body,now,ip){
  exactKeys(body,['requestId','kind','title','body','steps','version','context','website']);const playerId=await player(request,env),requestId=uuid(body.requestId);
@@ -161,6 +164,7 @@ export async function handle(request,env,ctx={},assets={}){
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null},200,cors);}
+  if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',p).first();return json({nickname:profile?.nickname||null},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/boards'){
    await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;
    return json({edition:EDITION.id,boards:await boardSnapshot(env,p),verification:'basic',generatedAt:now},200,cors);
@@ -175,9 +179,9 @@ export async function handle(request,env,ctx={},assets={}){
   if(url.pathname==='/v1/players'){
    exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)',id,await hash(token),now).run();response={playerId:id,playerToken:token};
   }else if(url.pathname==='/v1/sessions'){
-   exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(body.editionId!==EDITION.id)fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);
-   const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+editionFor(m)),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,editionFor(m),now,expiresAt,startDate).run();
-   const saved=await stmt(env,'SELECT id,created_at,expires_at,start_date FROM sf_sessions WHERE player_id=? AND run_id=? AND edition=?',p,run,editionFor(m)).first();if((saved.start_date||EDITION.start)!==startDate)fail(409,'SESSION_START_MISMATCH','這輪已使用另一個起始日期建立 Session。');response={sessionId:saved.id,sessionToken:token,createdAt:saved.created_at,expiresAt:saved.expires_at,mode:m,editionId:EDITION.id};
+   exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(!supportedEditions.includes(body.editionId))fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId),requestedEdition=editionFor(m,'cash',body.editionId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);
+   const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+requestedEdition),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,requestedEdition,now,expiresAt,startDate).run();
+   const saved=await stmt(env,'SELECT id,created_at,expires_at,start_date FROM sf_sessions WHERE player_id=? AND run_id=? AND edition=?',p,run,requestedEdition).first();if((saved.start_date||EDITION.start)!==startDate)fail(409,'SESSION_START_MISMATCH','這輪已使用另一個起始日期建立 Session。');response={sessionId:saved.id,sessionToken:token,createdAt:saved.created_at,expiresAt:saved.expires_at,mode:m,editionId:body.editionId};
   }else if(/^\/v1\/polls\/[a-zA-Z0-9_-]+\/vote$/.test(url.pathname)){response=await vote(request,env,url.pathname.split('/').at(-2),body,now,ip);
    }else if(url.pathname==='/v1/completions'){
     const who=await player(request,env);uuid(body.sessionId);if(typeof body.sessionToken!=='string'||!/^[a-f0-9]{64}$/.test(body.sessionToken))fail(401,'SESSION_INVALID','沒有有效的遊戲 Session。');const session=await stmt(env,'SELECT * FROM sf_sessions WHERE id=? AND player_id=? AND token_hash=?',body.sessionId,who,await hash(body.sessionToken)).first();if(!session||session.mode!=='life'||body.mode!=='life')fail(400,'INVALID_COMPLETION','只累計完整人生模式。');const prior=await stmt(env,'SELECT session_id FROM sf_life_completions WHERE session_id=?',session.id).first();if(prior)return json({counted:true,completions:await lifeCounts(env)},200,cors);if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','遊戲 Session 已到期。');await rate(env,'completion:'+who,20,3600,now);const r=validateScore(body,session,now);await stmt(env,'INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at) VALUES (?,?,?,?)',session.id,who,r.outcome,now).run();response={counted:true,completions:await lifeCounts(env)};
