@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "your-game-api",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "your-game-db",
+      "database_id": "YOUR_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://your-username.github.io"
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": [
+        "**/*.html",
+        "**/*.css",
+        "**/*.txt"
+      ],
+      "fallthrough": true
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "account_id": "YOUR_CLOUDFLARE_ACCOUNT_ID"
+}

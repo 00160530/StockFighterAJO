@@ -2,3 +2,8 @@ node_modules/
 .DS_Store
 *.log
 work/
+.env*
+!.env.example
+.dev.vars*
+*.private.json
+data/online-config.local.js

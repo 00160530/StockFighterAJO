@@ -1,6 +1,6 @@
 > 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
 >
-> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+> 遊戲網址：請至你自己的 Repository → Settings → Pages 查看。
 
 # 線上排行榜（0.13.2）
 
@@ -23,7 +23,7 @@ Worker 檢查 Session 所屬、使用／到期狀態、版本、模式、結局�
 
 ## API
 
-基底：`https://stockfighterajo-leaderboard-api.yyy335522001.workers.dev`
+基底：`<你的 Worker API 網址>`
 
 | 方法 | 路徑 | 功能 |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ Worker 檢查 Session 所屬、使用／到期狀態、版本、模式、結局�
 
 mode 接受 life、free；outcome 接受 won、lost，預設 won。舊 metric=loss 導向 lost，其餘舊 metric 導向 won；舊 financing 參數不再分榜。寫入與自己名次需匿名 Bearer token。公開排行榜不回傳玩家 token、Session、技能次數、遊玩時長或回報內容。
 
-Session／玩家 token 只存雜湊；Session 由伺服器時間判斷。D1 原子批次保證重複提交不能插入兩筆。預備 SQL 防止注入；JSON 限 8 KB；CORS 僅正式 GitHub Pages 來源及本機 4173。CORS 本身不是身分驗證。
+Session／玩家 token 只存雜湊；Session 由伺服器時間判斷。D1 原子批次保證重複提交不能插入兩筆。預備 SQL 防止注入；JSON 限 8 KB；CORS 來源由部署者在 Wrangler 的 ALLOWED_ORIGINS 設定，不含 repository 路徑。CORS 本身不是身分驗證。
 
 頻率：匿名身分每 IP 每日 100 次、Session 每玩家每小時 20 次／每 IP 每日 200 次、成績每玩家每小時 12 次／每 IP 每小時 30 次、回報每玩家每小時 5 次／每 IP 每小時 15 次、排行榜查詢每 IP 每分鐘 120 次。IP 以伺服器密鑰 HMAC 計桶，不儲存原始 IP。共用網路可能共用 IP 限制。
 

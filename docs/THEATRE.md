@@ -1,6 +1,6 @@
 > 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
 >
-> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+> 遊戲網址：請至你自己的 Repository → Settings → Pages 查看。
 
 # 行情心情與手指支撐線（0.8）
 

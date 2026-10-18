@@ -1,12 +1,12 @@
 > 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
 >
-> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+> 遊戲網址：請至你自己的 Repository → Settings → Pages 查看。
 
 # 許願池、問題回報與公告
 
 玩家由首頁開啟「許願池及問題回報」，選類型、標題與內容；問題可補重現步驟。可選附上當前遊戲日期與模式，版本固定附上。送出後顯示回報編號，內容存入 Cloudflare D1，不公開在遊戲裡，也不傳完整存檔。表單不保留草稿。
 
-管理後台：[小韭的服務台](https://stockfighterajo-leaderboard-api.yyy335522001.workers.dev/admin)。使用管理員設定的帳密登入，不需要 Cloudflare Zero Trust。登入有效 8 小時，可登出。資料庫儲存 PBKDF2-SHA256 加鹽雜湊，不存明文密碼；帳密不在前端或公開程式碼。
+管理後台由部署者以自己的 Worker API 網址後接 `/admin` 存取，設定方式見 [部署教學](DEPLOYMENT.md)。使用管理員設定的帳密登入，不需要 Cloudflare Zero Trust。登入有效 8 小時，可登出。資料庫儲存 PBKDF2-SHA256 加鹽雜湊，不存明文密碼；帳密不在前端或公開程式碼。
 
 ## 查看回報
 

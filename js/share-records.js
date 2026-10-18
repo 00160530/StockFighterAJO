@@ -2,6 +2,6 @@
 const amounts=['equity','benchmark','cash','returnPct','alpha','maxDrawdown','fees','tax','spent'],counts=['sessions','trades','choices','buyTrades','sellTrades'],marginFields=['totalBorrowed','totalInterest','interestPaid','totalTopups','liquidations','principal','interest','collateral'];
 const n=v=>Number.isFinite(v)?v:0;
 function payload(r){const out={schema:1,mode:r.mode||'free',status:r.status,date:r.date,financing:r.financing||'cash',statsVersion:1,statsComplete:r.statsVersion===1&&r.statsComplete===true,playTimeMs:r.playTimeMs??null,playTimePartial:r.playTimePartial===true,skillUses:r.skillUses?{mother:n(r.skillUses.mother),vip:n(r.skillUses.vip),divination:n(r.skillUses.divination)}:null,margin:{},realizedPnl:Number.isFinite(r.realizedPnl)?r.realizedPnl:null};for(const k of [...amounts,...counts])out[k]=n(r[k]);for(const k of marginFields)out.margin[k]=n(r.margin?.[k]);for(const k of ['maxGain','maxLoss']){const t=out.statsComplete?r[k]:null;out[k]=t?Object.fromEntries(['id','date','qty','price','costBasis','proceeds','pnl','returnPct'].map(f=>[f,t[f]])):null;}return out;}
-function link(id,base='https://00160530.github.io/StockFighterAJO/'){const url=new URL(base);url.search='';url.hash='';url.searchParams.set('record',id);return url.href;}
-const promotion='台股，簡單！來玩《台股戰士》，帶著 100 萬重回 2020，自己決定買賣、挑戰打敗 0050！\nhttps://00160530.github.io/StockFighterAJO/\n\n溫馨提醒：用電腦玩更好玩喔';
-root.TaiguShare={payload,link,promotion};})(globalThis);
+function link(id,base=root.location?.href){const url=new URL(base);url.search='';url.hash='';url.searchParams.set('record',id);return url.href;}
+function promotionText(base=root.location?.href){const url=new URL(base);url.search='';url.hash='';return '台股，簡單！來玩《台股戰士》，帶著 100 萬重回 2020，自己決定買賣、挑戰打敗 0050！\n'+url.href+'\n\n溫馨提醒：用電腦玩更好玩喔';}
+root.TaiguShare={payload,link,promotionText,get promotion(){return promotionText();}};})(globalThis);

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "stockfighterajo-leaderboard-api",
+  "name": "your-game-api",
   "main": "src/worker.mjs",
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
@@ -8,13 +8,13 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "stockfighterajo-leaderboard-db",
-      "database_id": "f0a34050-9b14-4163-8b87-952091c867a2",
+      "database_name": "your-game-db",
+      "database_id": "YOUR_D1_DATABASE_ID",
       "migrations_dir": "migrations"
     }
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "https://00160530.github.io,http://127.0.0.1:4173,http://localhost:4173"
+    "ALLOWED_ORIGINS": "https://your-username.github.io"
   },
   "rules": [
     {
@@ -30,5 +30,5 @@
   "observability": {
     "enabled": true
   },
-  "account_id": "24d8b4aa39f0912770915b6f8a41ec1f"
+  "account_id": "YOUR_CLOUDFLARE_ACCOUNT_ID"
 }

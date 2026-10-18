@@ -1,17 +1,21 @@
 > 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
 >
-> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+> 遊戲網址：請至你自己的 Repository → Settings → Pages 查看。
 
 # 台股戰士：小韭的第二次開盤
 
-可直接放上 GitHub Pages 的台股文字冒險遊戲。遊戲與存檔使用純 HTML、CSS、JavaScript，在本機瀏覽器執行；線上排行榜及許願／問題回報透過 Cloudflare Worker 寫入 D1，玩家不需註冊帳號。完整存檔不會上傳。
+可部署至自己的 GitHub Pages 的台股文字冒險遊戲。遊戲與存檔使用純 HTML、CSS、JavaScript，在本機瀏覽器執行；線上排行榜及許願／問題回報透過 Cloudflare Worker 寫入 D1，玩家不需註冊帳號。完整存檔不會上傳。
+
+## 部署自己的版本
+
+Fork 預設只啟用單機功能，不會連到其他人的 Worker。完整部署與既有正式站遷移方式見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。公開設定範本為 backend/wrangler.example.jsonc、data/online-config.example.js 及 .env.example。GitHub Pages 透過 Repository Variables 的 TAIGU_API_BASE 設定自己的 API；正式線上站另設 TAIGU_REQUIRE_ONLINE=true，避免漏填時發布離線版。管理帳密與 Worker Secret 不可放進前端。
 
 ## 0.10.0 更新：線上排行榜與回報管理
 
 - 人生／自由模式獨立排行榜，提供超額報酬、最大獲利及翻車紀錄三榜，每榜前 100 名；每個匿名身分各榜只保留最佳一筆。完整結算後輸入暱稱提交，顯示目前名次。
 - 開局建立伺服器 Session，限制單次提交、有效時間、格式、數值一致性及頻率；沿用原遊戲計分。屬於基本規則檢核，無法完全驗證真實遊玩。
 - 許願池及問題回報已接通 D1。獨立管理後台可查看回報、標記狀態、寫管理筆記及下架異常成績。使用帳密登入，密碼只以加鹽雜湊儲存。
-- 管理後台：[小韭的服務台](https://stockfighterajo-leaderboard-api.yyy335522001.workers.dev/admin)。目前由管理員登入查看，尚未串接郵件通知。部署及維護見 [backend/README.md](backend/README.md)。
+- 管理後台由部署者以自己的 Worker API 網址後接 `/admin` 存取，使用自己的帳密登入。部署及維護見 [backend/README.md](backend/README.md)。
 
 ## 0.9.2 更新：日期更醒目
 
@@ -92,7 +96,7 @@
 - 重製白牆、藍灰家具的租屋背景，介面改為白色、藍灰與青藍，移除暖黃色濾色。角色和既有本機存檔沿用。
 - 手機採垂直排列，不強迫把所有面板塞進同一畫面。
 
-線上版：[GitHub Pages](https://00160530.github.io/StockFighterAJO/)。美術提示詞與檔案見 [docs/ASSETS.md](docs/ASSETS.md)。
+線上版網址請到自己的 Repository → Settings → Pages 查看。美術提示詞與檔案見 [docs/ASSETS.md](docs/ASSETS.md)。
 
 ## 0.2 新增：起始畫面與四種 BGM
 
@@ -139,11 +143,11 @@
 1. 建立一個新的 GitHub repository，例如 `taigu-warrior`。使用 GitHub Free 時，請採公開 repository。
 2. 將**本資料夾裡的內容**放到 repository 根目錄；根目錄應直接看到 `index.html` 和 `package.json`。
 3. 到 **Settings → Pages → Build and deployment**，Source 選 **GitHub Actions**。附帶工作流程會測試並僅發布前端檔案，後端程式不會放入 Pages 網站。
-4. 等 GitHub 顯示網站網址，即可開啟遊戲。所有路徑都是相對路徑，支援 `/taigu-warrior/` 這種子路徑。
+4. 需要線上功能時先依部署教學設定自己的 Worker，以及 Repository Variables `TAIGU_API_BASE` 和 `TAIGU_REQUIRE_ONLINE=true`；未設定時為單機版。等 GitHub 顯示網站網址，即可開啟遊戲。所有路徑都是相對路徑，支援 `/taigu-warrior/` 這種子路徑。
 
 `.github/workflows/pages.yml` 會在推送 main 時執行前後端測試，以 `tools/build-pages.mjs` 產生前端發布目錄；沒有定時工作。
 
-本專案使用儲存庫 [00160530/StockFighterAJO](https://github.com/00160530/StockFighterAJO)。網站發布狀態與網址請以儲存庫 Settings → Pages 顯示為準。官方步驟：[建立 Pages 網站](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site)、[自訂部署工作流程](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+請使用自己 Fork 的儲存庫部署。網站發布狀態與網址請以儲存庫 Settings → Pages 顯示為準。官方步驟：[建立 Pages 網站](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site)、[自訂部署工作流程](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
 
 ## 之後接你的劇本
 

@@ -1,6 +1,6 @@
 > 本專案使用 AI 輔助開發，包含程式、劇情及美術素材。
 >
-> 遊戲網址：[台股戰士｜立即遊玩](https://00160530.github.io/StockFighterAJO/)
+> 遊戲網址：請至你自己的 Repository → Settings → Pages 查看。
 
 # 原型驗證紀錄
 
@@ -140,7 +140,7 @@
 
 已保存開場與遊戲畫面截圖於交付目錄。內建測試瀏覽器的安全政策僅允許 HTTP/HTTPS，因此未實際驗證 file:// 雙擊啟動；本機 HTTP 靜態伺服器與完整遊戲流程驗證通過。程式使用一般 scripts 和相對資源路徑，未依賴本機 fetch 或模組載入。
 
-0.2 版已推送至 `00160530/StockFighterAJO`，GitHub Actions Pages 部署成功。
+0.2 版已推送至 `your-username/your-game`，GitHub Actions Pages 部署成功。
 
 ## 0.3 桌面排版驗證（2026/10/17）
 

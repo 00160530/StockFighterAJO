@@ -24,6 +24,9 @@ jobs:
       - run: npm test
       - run: node --test backend/tests/*.test.mjs
       - run: node tools/build-pages.mjs
+        env:
+          TAIGU_API_BASE: ${{ vars.TAIGU_API_BASE }}
+          TAIGU_REQUIRE_ONLINE: ${{ vars.TAIGU_REQUIRE_ONLINE }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
