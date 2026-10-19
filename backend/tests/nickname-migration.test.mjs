@@ -32,7 +32,7 @@ test('unique-name migration preserves all legacy records and duplicates while pr
   db.prepare('INSERT INTO sf_stock_quote_likes VALUES (?,?,?)').run('legacy-one','legacy-two',3);
   before=snapshot(db);
  }});
- assert.deepEqual(snapshot(db),before);
+ const after=snapshot(db);assert.deepEqual(Object.fromEntries(Object.keys(before).map(name=>[name,after[name]])),before);
  db.prepare('UPDATE sf_players SET nickname=nickname,banned=1 WHERE id=?').run('legacy-one');
  db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run('new','new',1);
  assert.throws(()=>db.prepare('UPDATE sf_players SET nickname=? WHERE id=?').run('既有同名','new'),/SF_NICKNAME_TAKEN/);

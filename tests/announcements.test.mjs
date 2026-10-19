@@ -65,7 +65,7 @@ test('failed inline images leave the announcement text usable and show the origi
 
 test('the title-screen announcement flow marks a visible popup immediately and reopens only on the next Taiwan day',async()=>{
  const store=new Map();let now=Date.parse('2026-10-19T15:59:59Z');
- const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8'),flow=app.slice(app.indexOf('let announcement=null,'),app.indexOf('const nextTitleQuip='));
+ const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8'),flow=app.slice(app.indexOf('let managedUpdates=null;'),app.indexOf('const nextTitleQuip='));
  function context(){const shown=[],dialog={open:false,dataset:{}},elements={utilityDialog:dialog,utilityContent:{querySelectorAll:()=>[]},latestAnnouncement:{},announcementDone:{}};
   const sandbox={URL,Date:class extends Date{static now(){return now;}},KEY:'test',esc,screen:'title',incomingShare:null,shareLoading:false,window:{TAIGU_UPDATES:[]},TaiguCommunity:{latest:()=>null},online:{enabled:true,announcement:async()=>({announcement:{...announcement,imageUrl:'https://images.example.test/a.jpg'}})},document:{querySelector:()=>dialog.open?dialog:null},localStorage:{getItem:key=>store.get(key)},writeStorage:(key,value)=>store.set(key,JSON.stringify(value)),$:key=>elements[key],utility:(title,html,view)=>{shown.push({title,html});dialog.open=true;dialog.dataset.view=view;}};
   vm.createContext(sandbox);vm.runInContext(fs.readFileSync(new URL('../js/announcements.js',import.meta.url),'utf8'),sandbox);vm.runInContext(flow,sandbox);return {sandbox,shown,dialog};
@@ -75,4 +75,16 @@ test('the title-screen announcement flow marks a visible popup immediately and r
  assert.equal(JSON.parse(store.get('test.announcementSeenAt')).day,'2026-10-19');first.dialog.open=false;vm.runInContext('tryAnnouncement()',first.sandbox);assert.equal(first.shown.length,1);
  const reload=context();vm.runInContext('checkAnnouncement()',reload.sandbox);await vm.runInContext('announcementLoading',reload.sandbox);assert.equal(reload.shown.length,0);
  now=Date.parse('2026-10-19T16:00:00Z');vm.runInContext('tryAnnouncement()',reload.sandbox);assert.equal(reload.shown.length,1);assert.equal(JSON.parse(store.get('test.announcementSeenAt')).day,'2026-10-20');
+});
+
+test('managed update lists replace the static archive, including an empty list; legacy API retains the offline archive',async()=>{
+ const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8'),flow=app.slice(app.indexOf('let managedUpdates=null;'),app.indexOf('const nextTitleQuip='));
+ const original=[{id:'original',version:'1',date:'2026-10-19',title:'舊標題',summary:'舊摘要',details:['原始內容']}],edited=[{...original[0],title:'手動修改',summary:'新摘要'}];
+ for(const response of [{updates:edited},{updates:[]},{},{updates:[{bad:true}]}]){
+  const ticker={},sandbox={URL,Date,KEY:'test',esc,screen:'title',incomingShare:null,shareLoading:false,window:{TAIGU_UPDATES:original},TaiguCommunity:{latest:items=>items[0]},TaiguAnnouncements:c.TaiguAnnouncements,online:{enabled:true,announcement:async()=>response},localStorage:{getItem:()=>null},$:id=>id==='latestAnnouncement'?ticker:{open:false,dataset:{}},document:{querySelector:()=>null}};
+  vm.createContext(sandbox);vm.runInContext(flow,sandbox);vm.runInContext('checkAnnouncement()',sandbox);await vm.runInContext('announcementLoading',sandbox);
+  const expected=response.updates===edited?edited:response.updates?.length===0?[]:original;
+  assert.equal(JSON.stringify(vm.runInContext('currentUpdates()',sandbox)),JSON.stringify(expected));
+  assert.equal(ticker.innerHTML.includes('新摘要'),response.updates===edited);
+ }
 });

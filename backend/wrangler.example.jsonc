@@ -30,5 +30,8 @@
   "observability": {
     "enabled": true
   },
-  "account_id": "YOUR_CLOUDFLARE_ACCOUNT_ID"
+  "account_id": "YOUR_CLOUDFLARE_ACCOUNT_ID",
+  "build": {
+    "command": "node ../tools/sync-update-announcements.mjs"
+  }
 }

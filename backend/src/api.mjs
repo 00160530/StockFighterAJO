@@ -1,4 +1,5 @@
 import {readAnnouncement,publishAnnouncement} from './announcements.mjs';
+import {readUpdates,saveUpdate,deleteUpdate} from './update-announcements.mjs';
 import {quoteList,quoteBoards,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
@@ -128,6 +129,12 @@ async function admin(request,env,url,body,now,assets){
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
  if(request.method==='GET'&&url.pathname==='/admin/api/announcement')return json({announcement:await readAnnouncement(env)});
  if(request.method==='POST'&&url.pathname==='/admin/api/announcement')return json({published:true,announcement:await publishAnnouncement(env,body,actor)});
+ if(request.method==='GET'&&url.pathname==='/admin/api/updates')return json({items:await readUpdates(env)});
+ if(request.method==='POST'&&url.pathname==='/admin/api/updates')return json({item:await saveUpdate(env,body,actor)});
+ if(request.method==='POST'&&/^\/admin\/api\/updates\/[a-zA-Z0-9_.-]+(?:\/delete)?$/.test(url.pathname)){
+  const deleting=url.pathname.endsWith('/delete'),id=url.pathname.split('/').at(deleting?-2:-1);
+  return json(deleting?await deleteUpdate(env,body,actor,id):{item:await saveUpdate(env,body,actor,id)});
+ }
   if(request.method==='GET'&&url.pathname==='/admin/api/overview'){
   const count=await stmt(env,"SELECT (SELECT COUNT(*) FROM sf_feedback WHERE status='new') AS unread,(SELECT COUNT(*) FROM sf_feedback) AS feedback,(SELECT COUNT(*) FROM sf_runs WHERE hidden=0) AS runs,(SELECT COUNT(*) FROM sf_players) AS players").first();return json({actor,...count,edition:EDITION});
  }
@@ -161,11 +168,11 @@ fail(404,'NOT_FOUND','找不到這個後台功能。');
 export async function handle(request,env,ctx={},assets={}){
  const url=new URL(request.url),isAdmin=url.pathname==='/admin'||url.pathname.startsWith('/admin/'),now=nowSeconds();let cors={};
  try{
-  if(isAdmin){if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('x-admin-action')!=='1'))fail(403,'ORIGIN_DENIED','無法確認後台操作來源。');const body=request.method==='POST'?await readJson(request):null;return await admin(request,env,url,body,now,assets);}
+  if(isAdmin){if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('x-admin-action')!=='1'))fail(403,'ORIGIN_DENIED','無法確認後台操作來源。');const body=request.method==='POST'?await readJson(request,32768):null;return await admin(request,env,url,body,now,assets);}
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.5'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.15'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -174,7 +181,7 @@ export async function handle(request,env,ctx={},assets={}){
    if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);return json({completions:await lifeCounts(env),poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
-   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);return json({announcement:await readAnnouncement(env)},200,cors);}
+   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const [announcement,updates]=await Promise.all([readAnnouncement(env),readUpdates(env)]);return json({announcement,updates},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',p).first();return json({nickname:profile?.nickname||null},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/boards'){
    await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;

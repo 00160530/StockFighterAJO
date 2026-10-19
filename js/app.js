@@ -54,13 +54,15 @@ $('closeChart').onclick=()=>$('chartDialog').close();
 $('chartDialog').addEventListener('close',()=>{chartHome.replaceWith(chartPanel);$('expandChart').hidden=false;chart.draw();$('expandChart').focus();});
 
 
+let managedUpdates=null;
+function currentUpdates(){return managedUpdates??window.TAIGU_UPDATES??[];}
 let announcement=null,announcementLoading=null,shownAnnouncementAt=null,announcementSeenAt=0;try{announcementSeenAt=JSON.parse(localStorage.getItem(KEY+'.announcementSeenAt')||'0');}catch{}
 function announcementDate(at){return new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});}
-function renderAnnouncementTicker(){const latest=TaiguCommunity.latest(window.TAIGU_UPDATES),messages=[];if(latest)messages.push('【最新更新】'+latest.date.replaceAll('-','/')+' · '+latest.summary);if(announcement)messages.push('【作者公告】'+announcementDate(announcement.publishedAt)+' · '+announcement.title);const text=messages.join('　｜　');$('latestAnnouncement').innerHTML='<span>'+esc(text)+'</span><span aria-hidden="true">'+esc(text)+'</span>';}
+function renderAnnouncementTicker(){const latest=TaiguCommunity.latest(currentUpdates()),messages=[];if(latest)messages.push('【最新更新】'+latest.date.replaceAll('-','/')+' · '+latest.summary);if(announcement)messages.push('【作者公告】'+announcementDate(announcement.publishedAt)+' · '+announcement.title);const text=messages.join('　｜　');$('latestAnnouncement').innerHTML='<span>'+esc(text)+'</span><span aria-hidden="true">'+esc(text)+'</span>';}
 function announcementHTML(a){return '<article class="announcement-item official-announcement"><header><b>作者公告</b><time>'+esc(announcementDate(a.publishedAt))+'</time></header><h3>'+esc(a.title)+'</h3><p class="announcement-body">'+esc(a.body)+'</p>'+TaiguAnnouncements.imageHTML(a,esc)+'</article>';}
 function markAnnouncement(at){announcementSeenAt=TaiguAnnouncements.mark(at,announcementSeenAt);writeStorage(KEY+'.announcementSeenAt',announcementSeenAt);}
 function tryAnnouncement(){if(incomingShare||shareLoading||screen!=='title'||!TaiguAnnouncements.unseen(announcement,announcementSeenAt)||document.querySelector('dialog[open]'))return;shownAnnouncementAt=announcement.publishedAt;utility('公告','<div class="announcement-scroll">'+announcementHTML(announcement)+'</div><div class="dialog-actions announcement-actions"><button id="announcementDone" class="primary">知道了</button></div>','announcement');markAnnouncement(announcement.publishedAt);$('announcementDone').onclick=()=>$('utilityDialog').close();}
-function checkAnnouncement(){if(!online.enabled||announcementLoading)return;announcementLoading=online.announcement().then(r=>{announcement=TaiguAnnouncements.valid(r.announcement)?r.announcement:null;renderAnnouncementTicker();if($('utilityDialog').open&&$('utilityDialog').dataset.view==='updates')showUpdates();else tryAnnouncement();}).catch(()=>{}).finally(()=>announcementLoading=null);}
+function checkAnnouncement(){if(!online.enabled||announcementLoading)return;announcementLoading=online.announcement().then(r=>{if(Array.isArray(r.updates)&&r.updates.every(a=>a&&typeof a.version==='string'&&typeof a.date==='string'&&typeof a.title==='string'&&typeof a.summary==='string'&&Array.isArray(a.details)&&a.details.every(t=>typeof t==='string')))managedUpdates=r.updates;announcement=TaiguAnnouncements.valid(r.announcement)?r.announcement:null;renderAnnouncementTicker();if($('utilityDialog').open&&$('utilityDialog').dataset.view==='updates')showUpdates();else tryAnnouncement();}).catch(()=>{}).finally(()=>announcementLoading=null);}
 
 const nextTitleQuip=TaiguTheatre.quips();let titleQuipTimer;
 const theatre=TaiguTheatre.create(market),supportGame=new TaiguSupport.Scene({dialog:$('supportDialog'),eventDialog:$('supportEventDialog'),sound:kind=>music.sfx(kind)});
@@ -374,7 +376,7 @@ function showAbout(){
  aboutPlaques=new TaiguAboutPlaques.Scene({element:$('aboutPlaques'),dialog:$('utilityDialog'),storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>{if(!resettingRecords)localStorage.setItem(key,value);}}});
 }
 function showUpdates(){
- const items=(window.TAIGU_UPDATES||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.version.localeCompare(a.version,undefined,{numeric:true}));
+ const items=currentUpdates().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.version.localeCompare(a.version,undefined,{numeric:true}));
  if(announcement)markAnnouncement(announcement.publishedAt);utility('更新及公告','<div class="announcement-list">'+(announcement?announcementHTML(announcement):'')+items.map((a,i)=>'<article class="announcement-item"><header><b>v'+esc(a.version)+'</b><time>'+esc(a.date.replaceAll('-','/'))+'</time>'+(i===0?'<span>最新更新</span>':'')+'</header><h3>'+esc(a.title)+'</h3><ul>'+a.details.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></article>').join('')+'</div>','updates');
 }
 function showFeedback(){

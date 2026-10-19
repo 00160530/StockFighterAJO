@@ -23,7 +23,7 @@
 
 ## 更新公告
 
-編輯 `data/updates.js`，新增一筆 id、date、version、title、summary、details。首頁公告按鈕右側顯示最新日期的 summary；details 保持簡短。聚焦／滑鼠移入暫停跑馬燈，減少動畫時改靜態。公告仍隨靜態遊戲發布，不透過管理後台編輯。
+編輯 `data/updates.js`，新增一筆 id、date、version、title、summary、details。首頁公告按鈕右側顯示最新日期的 summary；details 保持簡短。聚焦跑馬燈文字／滑鼠移入文字時暫停，減少動畫時改靜態。版本公告會自動匯入後台，管理員可後續修改或刪除；操作成功會跳出提示。發版需同步部署 Worker，詳見 [UPDATE_ANNOUNCEMENTS.md](UPDATE_ANNOUNCEMENTS.md)。
 
 ## 資料位置
 

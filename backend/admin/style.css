@@ -20,3 +20,5 @@ main:has(#quoteFilters:not([hidden])){max-width:1700px}.quote-filters{display:fl
 .announcement-editor small{font-size:12px;color:#758c7d;overflow-wrap:anywhere}
 .announcement-editor .announcement-daily{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px}
 .announcement-daily input{width:18px;height:18px;margin:0;accent-color:#446f51}
+
+.admin-announcements{display:grid;gap:14px}.admin-announcements>p{margin:0}.admin-announcements summary{cursor:pointer;overflow-wrap:anywhere}.admin-announcements .announcement-editor h2{margin-bottom:0}.announcement-editor .editor-status{color:#a64059;white-space:pre-wrap}.admin-announcements input[type=date]{max-width:240px}.admin-announcements .quote-delete{color:#a64059;background:#fff1f4;border-color:#dfadba}
