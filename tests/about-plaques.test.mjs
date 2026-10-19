@@ -104,11 +104,11 @@ test('the bucket fits to the right of all ten plaques on desktop and narrow layo
  for(const width of [240,320,600,1200]){const g=layout(width),last=g.homes.at(-1),bucket=g.bucket;assert.ok(bucket.x-bucket.w/2>last.x+g.w/2);assert.ok(bucket.x+bucket.w/2<=g.width);assert.ok(g.w>0);}
 });
 test('dropping in the bucket returns the plaque to its current assigned slot exactly once',()=>{
- const w=new World(600),b=w.bodies[0],bucket=w.geometry.bucket;w.hang(0,7);w.grab(0);w.move(0,bucket.x,bucket.y);assert.equal(w.inBucket(0),true);assert.equal(w.release(0),true);assert.equal(b.state,'hung');assert.equal(b.slot,7);assert.equal(b.x,b.home.x);assert.equal(b.angle,0);assert.deepEqual(Array.from(w.takeReturns()),[0]);w.step(.05);assert.equal(w.takeReturns().length,0);
+ const w=new World(600),b=w.bodies[0],bucket=w.geometry.bucket;w.hang(0,7);w.grab(0);w.move(0,bucket.x,bucket.y);assert.equal(w.inBucket(0),true);assert.equal(w.release(0),true);assert.equal(b.state,'hung');assert.equal(b.slot,7);assert.equal(b.x,b.home.x);assert.equal(b.angle,0);assert.deepEqual(Array.from(w.takeReturns(),r=>({...r})),[{id:0,points:1}]);w.step(.05);assert.equal(w.takeReturns().length,0);
  const miss=w.bodies[1];w.grab(1);w.move(1,bucket.x,bucket.y+bucket.h);assert.equal(w.release(1),false);assert.equal(miss.state,'free');assert.equal(w.takeReturns().length,0);
 });
 test('fast thrown plaques are caught when crossing the bucket, while passing beside it is not a hit',()=>{
- const w=new World(600,1),b=w.bodies[0],bucket=w.geometry.bucket;Object.assign(b,{state:'free',x:bucket.x,y:bucket.y-bucket.h/2-5,vy:1200,vx:0});w.step(.05);assert.equal(b.state,'hung');assert.deepEqual(Array.from(w.takeReturns()),[0]);
+ const w=new World(600,1),b=w.bodies[0],bucket=w.geometry.bucket;Object.assign(b,{state:'free',x:bucket.x,y:bucket.y-bucket.h/2-5,vy:1200,vx:0});w.step(.05);assert.equal(b.state,'hung');assert.deepEqual(Array.from(w.takeReturns(),r=>({...r})),[{id:0,points:1}]);
  Object.assign(b,{state:'free',sleeping:false,x:bucket.x+bucket.w,y:bucket.y-bucket.h/2-5,vy:1200,vx:0});w.step(.05);assert.equal(b.state,'free');assert.equal(w.takeReturns().length,0);
 });
 test('bucket scoring appears at varying positions, prevents a following click, persists and cleans up on close',()=>{
@@ -116,4 +116,35 @@ test('bucket scoring appears at varying positions, prevents a following click, p
  const drop=()=>{const b=w.bodies[0],bucket=w.geometry.bucket;card.emit('pointerdown',s.point(b));card.emit('pointermove',s.point(bucket,{timeStamp:30}));card.emit('pointerup',s.point(bucket,{timeStamp:40}));};drop();assert.equal(w.bodies[0].state,'hung');assert.equal(card.emit('click').defaultPrevented,true);assert.equal(s.controller.effects.size,1);assert.match(s.status.textContent,/收納桶.*\+1/);const first=[...s.controller.effects][0].node;assert.equal(first.textContent,'+1');first.emit('animationend');assert.equal(first.removed,true);assert.equal(s.controller.effects.size,0);
  drop();assert.equal(s.controller.effects.size,1);const second=[...s.controller.effects][0].node;s.controller.destroy();assert.equal(second.removed,true);assert.equal(s.timers.size,0);const reopened=scene({storage});assert.equal(reopened.controller.world.bodies[0].state,'hung');assert.equal(reopened.controller.effects.size,0);reopened.controller.destroy();
  const bucket=layout(600,10,{homeTop:180}).bucket,position=context.TaiguAboutPlaques.scorePosition,a=position(bucket,600,300,()=>.1),b=position(bucket,600,300,()=>.9);assert.notEqual(a.x,b.x);assert.notEqual(a.y,b.y);assert.ok(a.x>=20&&b.x<=580);assert.ok(a.y>=54&&b.y<=285);
+});
+
+test('score text stays entirely above the bucket, including the animation scale and tight top boundaries',()=>{
+ const position=context.TaiguAboutPlaques.scorePosition;
+ for(const top of [1,16,60,180,400])for(const r of [0,.1,.5,.9,1]){
+  const bucket={x:550,y:top+28,w:52,h:56},p=position(bucket,600,500,()=>r);
+  assert.ok(p.y>=0);assert.ok(p.y+p.size*1.3<=top+1e-8);assert.ok(p.size<=23);
+ }
+});
+
+test('throw distance awards 1–3 points proportionally on narrow and wide dialogs',()=>{
+ const points=context.TaiguAboutPlaques.throwPoints,bucket={x:0,y:0};
+ for(const width of [240,600,1200])for(const [ratio,expected] of [[0,1],[.249,1],[.25,2],[.549,2],[.55,3],[2,3]])assert.equal(points({x:width*ratio,y:0},bucket,width),expected);
+ assert.equal(points({x:0,y:300},bucket,600),2);
+});
+
+test('near, medium and far releases retain their award until impact, then reset for the next drop',()=>{
+ for(const [distance,points] of [[80,1],[200,2],[400,3]]){
+  const w=new World(600,10,{homeTop:180,height:500}),b=w.bodies[0],bucket=w.geometry.bucket;
+  w.grab(0);w.move(0,bucket.x-distance,bucket.y-80,700,-100);w.release(0);assert.equal(b.bucketPoints,points);assert.equal(w.takeReturns().length,0);
+  Object.assign(b,{x:bucket.x,y:bucket.y-bucket.h/2-4,vy:1200,vx:0});w.step(.02);
+  assert.deepEqual(Array.from(w.takeReturns(),r=>({...r})),[{id:0,points}]);assert.equal(b.bucketPoints,1);w.step(.05);assert.equal(w.takeReturns().length,0);
+  w.grab(0);w.move(0,bucket.x,bucket.y);w.release(0);assert.equal(w.takeReturns()[0].points,1);
+ }
+});
+
+test('pending throw points survive reopening and resizing; cancelled or fresh drags clear the previous award',()=>{
+ const w=new World(600,10,{homeTop:180,height:500}),bucket=w.geometry.bucket;w.grab(0);w.move(0,40,100);w.release(0);assert.equal(w.bodies[0].bucketPoints,3);
+ const restored=new World(600,10,{homeTop:180,height:500});assert.equal(restored.restore(w.snapshot()),true);assert.equal(restored.bodies[0].bucketPoints,3);restored.resize(300,10,{homeTop:90,height:300});assert.equal(restored.bodies[0].bucketPoints,3);
+ restored.grab(0);assert.equal(restored.bodies[0].bucketPoints,1);restored.move(0,25,40);restored.release(0,{cancelled:true});assert.equal(restored.bodies[0].bucketPoints,1);assert.equal(restored.takeReturns().length,0);
+ const legacy=w.snapshot();delete legacy.bodies[0].bucketPoints;assert.equal(restored.restore(legacy),true);assert.equal(restored.bodies[0].bucketPoints,1);
 });

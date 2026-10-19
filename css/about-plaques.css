@@ -22,6 +22,6 @@
 .about-plaque-bucket img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none}
 .about-plaque-bucket.is-target{filter:drop-shadow(0 0 5px #7abd8f);transform:scale(1.08)}
 .about-bucket-score{position:absolute;z-index:40;pointer-events:none;font:900 23px/1 ui-rounded,system-ui,sans-serif;color:#d89937;text-shadow:0 2px 0 #fff,0 3px 8px #83633440;animation:aboutBucketScore 1.1s ease-out both;will-change:transform,opacity}
-@keyframes aboutBucketScore{0%{opacity:0;transform:translate(-50%,8px) scale(.6)}20%{opacity:1;transform:translate(-50%,-8px) scale(1.2)}65%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--score-drift)), -54px) scale(.95)}}
+@keyframes aboutBucketScore{0%{opacity:0;transform:translate(-50%,0) scale(.6)}20%{opacity:1;transform:translate(-50%,-8px) scale(1.2)}65%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--score-drift)), -54px) scale(.95)}}
 @media(prefers-reduced-motion:reduce){.about-plaque-bucket{transition:none}.about-bucket-score{animation:aboutBucketScoreFade 1s ease-out both}}
 @keyframes aboutBucketScoreFade{0%,75%{opacity:1}100%{opacity:0}}
