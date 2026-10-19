@@ -47,5 +47,20 @@ test('backgrounding, window blur, multi-touch and disposal clear pending timers'
  }
 });
 test('a completed touch does not swallow keyboard clicks or start hold timers for pen input',()=>{
- const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');a.element.emit('click',{detail:0});a.element.emit('pointerdown',{pointerType:'pen'});a.tick(800);a.element.emit('pointerenter',{pointerType:'pen'});a.element.emit('pointerleave',{pointerType:'pen'});a.element.emit('click',{pointerType:'pen'});assert.deepEqual(a.calls,['enter','click','enter','leave','click']);assert.equal(a.pending.size,0);
+ const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');a.element.emit('keydown',{key:'Enter'});a.element.emit('click',{detail:0});a.element.emit('pointerdown',{pointerType:'pen'});a.tick(800);a.element.emit('pointerenter',{pointerType:'pen'});a.element.emit('pointerleave',{pointerType:'pen'});a.element.emit('click',{pointerType:'pen'});assert.deepEqual(a.calls,['enter','click','enter','leave','click']);assert.equal(a.pending.size,0);
+});
+
+test('a completed hold blocks every compatibility click even when Safari reports mouse or omits touch metadata',()=>{
+ for(const props of [{pointerType:'mouse'},{pointerType:'mouse',detail:0},{pointerType:'',detail:0},{detail:0},{pointerType:'pen'},{pointerType:'touch'}]){
+  const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');const compatibilityClick=a.element.emit('click',props);
+  assert.equal(compatibilityClick.defaultPrevented,true,JSON.stringify(props));assert.deepEqual(a.calls,['enter']);
+ }
+});
+test('a fresh mouse press or keyboard activation after a hold still opens character selection normally',()=>{
+ for(const key of ['Enter',' ','Spacebar']){const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');a.element.emit('keydown',{key});assert.equal(a.element.emit('click',{detail:0}).defaultPrevented,false);assert.deepEqual(a.calls,['enter','click']);}
+ const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');a.element.emit('pointerdown',{pointerType:'mouse'});assert.equal(a.element.emit('click',{pointerType:'mouse'}).defaultPrevented,false);assert.deepEqual(a.calls,['enter','click']);
+});
+test('metadata-independent click blocking also applies to cancelled touches and a later short tap remains usable',()=>{
+ const a=setup();a.touch('pointerdown');a.tick(100);a.touch('pointercancel');assert.equal(a.element.emit('click',{pointerType:'mouse',detail:0}).defaultPrevented,true);assert.deepEqual(a.calls,[]);
+ a.touch('pointerdown');a.tick(50);a.touch('pointerup');a.element.emit('click',{pointerType:'mouse'});assert.deepEqual(a.calls,['click']);
 });

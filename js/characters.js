@@ -32,10 +32,12 @@ function bindTitleInteraction(element,{click,enter,leave}){
   pointercancel:e=>{if(touch&&e.pointerId===touch.id)cancelTouch();},
   lostpointercapture:e=>{if(touch&&e.pointerId===touch.id)cancelTouch();},
   contextmenu:e=>{if(touch||e.pointerType==='touch'||blockTouchClick&&!e.pointerType)e.preventDefault();},
-  selectstart:e=>{if(touch)e.preventDefault();}
+  selectstart:e=>{if(touch)e.preventDefault();},
+  keydown:e=>{if(e.key==='Enter'||e.key===' '||e.key==='Spacebar')blockTouchClick=false;}
  };
  for(const [type,handler]of Object.entries(handlers))element.addEventListener(type,handler);
- const onClick=e=>{if(blockTouchClick&&(e.pointerType==='touch'||!e.pointerType&&e.detail!==0)){e.preventDefault();e.stopImmediatePropagation();return;}click(e);};
+ // Safari may label a touch-generated click as mouse: trust the completed gesture instead.
+ const onClick=e=>{if(blockTouchClick){e.preventDefault();e.stopImmediatePropagation();return;}click(e);};
  element.onclick=onClick;
  const onVisibility=()=>{if(root.document.hidden)cancelTouch();};
  root.addEventListener?.('blur',cancelTouch);root.document?.addEventListener('visibilitychange',onVisibility);
