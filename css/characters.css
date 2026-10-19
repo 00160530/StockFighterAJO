@@ -16,6 +16,7 @@ body[data-character=xiaoxiaojiu]{--character-sheet:url('../assets/characters/xia
 .character-card[data-character=xiaojiu] .character-preview{background-image:url('../assets/xiaojiu-expressions.png?v=0.14.2')}
 .character-card[data-character=xiaoxiaojiu] .character-preview{background-image:url('../assets/characters/xiaoxiaojiu/expressions.webp?v=0.16.0')}
 .character-card strong{font-size:18px;line-height:1.4}
+.character-description{font-size:12px;line-height:1.5;color:#63836d}
 .character-card small{font-size:11px;min-height:19px;color:#63836d}
 .utility-dialog[data-view=characters] .dialog-actions{display:flex;justify-content:flex-end;margin-top:16px}
 .utility-dialog[data-view=characters] .dialog-actions button{margin:0!important}
