@@ -21,3 +21,5 @@ body[data-character=xiaoxiaojiu]{--character-sheet:url('../assets/characters/xia
 .utility-dialog[data-view=characters] .dialog-actions button{margin:0!important}
 .character-switch-hint{display:block;font-size:10px;color:#6d8877;text-align:center;margin-top:4px;line-height:1.6}
 @media(max-width:650px){.utility-dialog[data-view=characters] #utilityContent{padding:16px}.utility-dialog[data-view=characters] .dialog-heading{padding:13px 16px}.character-choices{gap:10px}.character-card{padding:10px 6px}.character-card strong{font-size:16px}}
+
+@media(any-pointer:coarse){#titleCharacter{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}}
