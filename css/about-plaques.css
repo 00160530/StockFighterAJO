@@ -3,7 +3,9 @@
 .utility-dialog[data-view=about]>.dialog-heading{position:relative;flex-shrink:0;z-index:auto}
 .utility-dialog[data-view=about] #closeUtility{position:relative;z-index:40}
 .utility-dialog[data-view=about] #utilityContent{overflow:auto;min-height:0}
-.about-plaques{margin-top:16px;border:0;padding:0}
+.about-plaques{position:relative;margin-top:16px;border:0;padding:0}
+.about-plaque-total{position:absolute;left:24px;bottom:0;margin:0;font-size:11px;line-height:18px;color:#627b6b}
+@media(max-width:650px){.about-plaque-total{left:12px;font-size:10px}}
 .about-plaque-stage{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:5}
 .about-plaque-home{position:absolute;display:grid;place-items:center;border:1px dashed #b3c8b9;border-radius:8px;color:#8e9e88;font-size:0;pointer-events:none;transition:background .15s,border-color .15s}
 .about-plaque-home.is-target{border-color:#53816a;background:#b5d8bd80;color:#456d52;box-shadow:0 0 0 4px #c8e0cb77}

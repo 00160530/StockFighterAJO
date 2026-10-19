@@ -44,10 +44,10 @@ class Target{
 function scene(options={}){
  const frames=new Map(),timers=new Map(),host=new Target(),doc=new Target();doc.hidden=false;let frameId=0,timerId=0,observer;doc.createElement=()=>{const node=new Target();return Object.assign(node,{style:{setProperty(key,value){this[key]=value;}},setAttribute(key,value){this[key]=value;},remove(){this.removed=true;}});};
  const sandbox={setTimeout:(fn,ms)=>{timers.set(++timerId,{fn,ms});return timerId;},clearTimeout:id=>timers.delete(id),addEventListener:host.addEventListener.bind(host),removeEventListener:host.removeEventListener.bind(host),requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id),ResizeObserver:class{constructor(fn){this.fn=fn;observer=this;}observe(){}disconnect(){this.disconnected=true;}}};vm.createContext(sandbox);vm.runInContext(source,sandbox);
- const stage={style:{},children:[],append(node){this.children.push(node);},remove(){this.removed=true;},getBoundingClientRect:()=>({left:50,top:80,width:600,height:500})},status={},reset=new Target(),bucket={style:{},classList:{toggle(name,value){this[name]=value;}}};
+ const stage={style:{},children:[],append(node){this.children.push(node);},remove(){this.removed=true;},getBoundingClientRect:()=>({left:50,top:80,width:600,height:500})},status={},score={},reset=new Target(),bucket={style:{},classList:{toggle(name,value){this[name]=value;}}};
  const cards=Array.from({length:10},(_,i)=>{const c=new Target();Object.assign(c,{dataset:{name:'心情'+i},style:{},setAttribute(key,value){this[key]=value;},capture:null,setPointerCapture(id){this.capture=id;},hasPointerCapture(id){return this.capture===id;},releasePointerCapture(){this.capture=null;}});return c;});
- const homes=cards.map(()=>({style:{},classList:{toggle(){}}})),lookup={'.about-plaque-stage':stage,'.about-plaque-bucket':bucket,'.about-plaques-status':status,'.about-plaques-reset':reset},element={isConnected:true,ownerDocument:doc,style:{},parentElement:new Target(),getBoundingClientRect:()=>({left:72,top:380,width:556,height:90}),querySelector:key=>lookup[key],querySelectorAll:key=>key==='[data-plaque]'?cards:homes},dialog={open:true,append(){}};
- const controller=new sandbox.TaiguAboutPlaques.Scene({element,dialog,...options});return {controller,timers,cards,homes,frames,reset,host,doc,status,observer,dialog,point:(b,extra={})=>({clientX:b.x+50,clientY:b.y+80,...extra})};
+ const homes=cards.map(()=>({style:{},classList:{toggle(){}}})),lookup={'.about-plaque-stage':stage,'.about-plaque-bucket':bucket,'.about-plaques-status':status,'.about-plaque-total':score,'.about-plaques-reset':reset},element={isConnected:true,ownerDocument:doc,style:{},parentElement:new Target(),getBoundingClientRect:()=>({left:72,top:380,width:556,height:90}),querySelector:key=>lookup[key],querySelectorAll:key=>key==='[data-plaque]'?cards:homes},dialog={open:true,append(){}};
+ const controller=new sandbox.TaiguAboutPlaques.Scene({element,dialog,...options});return {controller,timers,cards,homes,frames,reset,host,doc,status,score,observer,dialog,point:(b,extra={})=>({clientX:b.x+50,clientY:b.y+80,...extra})};
 }
 test('pointer drag and its following compatibility click do not count as another tap, while the next tap works',()=>{
  const s=scene(),b=s.controller.world.bodies[0],card=s.cards[0];card.emit('click');assert.equal(b.state,'tilted');card.emit('click');assert.equal(b.state,'free');
@@ -147,4 +147,15 @@ test('pending throw points survive reopening and resizing; cancelled or fresh dr
  const restored=new World(600,10,{homeTop:180,height:500});assert.equal(restored.restore(w.snapshot()),true);assert.equal(restored.bodies[0].bucketPoints,3);restored.resize(300,10,{homeTop:90,height:300});assert.equal(restored.bodies[0].bucketPoints,3);
  restored.grab(0);assert.equal(restored.bodies[0].bucketPoints,1);restored.move(0,25,40);restored.release(0,{cancelled:true});assert.equal(restored.bodies[0].bucketPoints,1);assert.equal(restored.takeReturns().length,0);
  const legacy=w.snapshot();delete legacy.bodies[0].bucketPoints;assert.equal(restored.restore(legacy),true);assert.equal(restored.bodies[0].bucketPoints,1);
+});
+
+
+test('bucket total adds every distance award once, ignores misses, and resets on close while plaque positions persist',()=>{
+ const storage=memoryStorage(),s=scene({storage}),w=s.controller.world;
+ assert.equal(s.score.textContent,'得分：0 (關閉視窗後歸零)');
+ for(const points of [1,2,3]){const b=w.bodies[0],bucket=w.geometry.bucket;w.grab(0);w.move(0,bucket.x,bucket.y);b.bucketPoints=points;w.release(0);assert.equal(s.controller.flushReturns(),1);assert.equal(s.controller.flushReturns(),0);}
+ assert.equal(s.controller.totalScore,6);assert.equal(s.score.textContent,'得分：6 (關閉視窗後歸零)');
+ w.grab(1);w.move(1,250,100);w.release(1);s.controller.flushReturns();assert.equal(s.controller.totalScore,6);
+ w.hang(2,8);w.activate(2);s.controller.destroy();assert.equal(s.controller.totalScore,0);assert.equal(s.score.textContent,'得分：0 (關閉視窗後歸零)');
+ const reopened=scene({storage});assert.equal(reopened.controller.totalScore,0);assert.equal(reopened.score.textContent,'得分：0 (關閉視窗後歸零)');assert.equal(reopened.controller.world.bodies[2].slot,8);assert.equal(reopened.controller.world.bodies[2].state,'tilted');reopened.controller.destroy();
 });
