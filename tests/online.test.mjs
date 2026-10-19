@@ -40,3 +40,11 @@ test('server nickname conflicts restore the canonical name without consuming a l
  await client.start({runId:summary.id,mode:'life',day:-1,status:'playing'});await assert.rejects(client.submit(summary,'換名字'),e=>e.code==='NICKNAME_LOCKED');
  assert.equal(client.read().lockedNickname,'原來名字');assert.equal(client.receipt(summary.id),null);
 });
+
+test('a taken nickname leaves the local session and name editable for a successful retry',async()=>{
+ const a=stub(),client=new Client({config,storage:storage(),now:()=>1000,fetcher:(url,options)=>url.endsWith('/v1/scores')&&JSON.parse(options.body).nickname==='已有人使用'?Promise.resolve(Response.json({error:{code:'NICKNAME_TAKEN',message:'這個暱稱已有人使用，請換一個暱稱。'}},{status:409})):a.fetcher(url,options)});
+ await client.start({runId:summary.id,mode:'life',day:-1,status:'playing'});
+ await assert.rejects(client.submit(summary,'已有人使用'),e=>e.code==='NICKNAME_TAKEN');
+ assert.equal(client.receipt(summary.id),null);assert.ok(!client.read().lockedNickname);assert.equal(client.eligibility(summary).ok,true);
+ await client.submit(summary,'全新的名字');assert.equal(client.read().lockedNickname,'全新的名字');assert.equal(client.receipt(summary.id).submitted,true);
+});

@@ -87,14 +87,21 @@ async function submit(request,env,body,now,ip){
  if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','這輪的線上 Session 已到期，本機紀錄仍會保留。');
  const r=validateScore(body,session,now),id=crypto.randomUUID(),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();
  if(profile?.nickname&&profile.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:profile.nickname});
- const results=await env.DB.batch([
+ const nameTaken=()=>fail(409,'NICKNAME_TAKEN','這個暱稱已有人使用，請換一個暱稱。');
+ if(!profile?.nickname&&await stmt(env,'SELECT 1 FROM sf_players WHERE nickname IS NOT NULL AND lower(trim(nickname))=lower(trim(?)) AND id<>? LIMIT 1',r.nickname,playerId).first())nameTaken();
+ let results;try{results=await env.DB.batch([
   stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>? AND EXISTS (SELECT 1 FROM sf_players p WHERE p.id=sf_sessions.player_id AND (p.nickname IS NULL OR p.nickname=?))',now,id,session.id,playerId,tokenHash,now,r.nickname),
   stmt(env,'UPDATE sf_players SET nickname=? WHERE id=? AND nickname IS NULL AND EXISTS (SELECT 1 FROM sf_sessions WHERE id=? AND submission_id=?)',r.nickname,playerId,session.id,id),
   stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps)
    SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),r.nickname,r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.avatarId,r.avatarCharacter,r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),session.id,id),
   stmt(env,"INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at) SELECT session_id,player_id,outcome,submitted_at FROM sf_runs WHERE id=? AND mode='life'",id),
    ...METRICS.map(metric=>bestInsert(env,id,metric))
- ]);
+ ]);}catch(error){
+  // The database trigger closes the race after the precheck. D1 rolls back
+  // the whole batch, so a rejected nickname never consumes the game session.
+  if([error?.message,error?.cause?.message].some(message=>typeof message==='string'&&message.includes('SF_NICKNAME_TAKEN')))nameTaken();
+  throw error;
+ }
  if(!results[2].meta.changes){const current=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();if(current?.nickname&&current.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:current.nickname});fail(409,'SESSION_USED','這輪已提交過成績。');}
  return {submitted:true,runId:id,nickname:r.nickname,rank:await ranking(env,session.mode,r.outcome,playerId),verification:'basic'};
 }

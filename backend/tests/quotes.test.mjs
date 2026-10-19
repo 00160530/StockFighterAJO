@@ -13,7 +13,8 @@ function setup(){
   assert.notEqual(r.status,500,DB.errors.join('\n'));return {status:r.status,data:await r.json()};
  }
  async function who(){return (await call('/v1/players',{})).data;}
- async function complete(p,{mode='life',outcome='lost',upload=true,name='金句小韭'}={}){
+ async function complete(p,{mode='life',outcome='lost',upload=true,name}={}){
+  name??=DB.db.prepare('SELECT nickname FROM sf_players WHERE id=?').get(p.playerId).nickname||'股友'+p.playerId.slice(0,12);
   const session=(await call('/v1/sessions',{runId:crypto.randomUUID(),mode,editionId:EDITION.id,startDay:-1},p.playerToken)).data;
   DB.db.prepare('UPDATE sf_sessions SET created_at=created_at-180 WHERE id=?').run(session.sessionId);
   const equity=outcome==='won'?600000000:100000000,body={...session,editionId:EDITION.id,mode,outcome,date:EDITION.datasetEnd,sessions:EDITION.sessions,equityCents:equity,benchmarkCents:EDITION.benchmarkCents,score:Math.round((equity-EDITION.benchmarkCents)/10000),drawdownBps:0,trades:outcome==='won'?2:0,buyTrades:outcome==='won'?1:0,sellTrades:outcome==='won'?1:0,maxGain:null,maxLoss:null,nickname:name};

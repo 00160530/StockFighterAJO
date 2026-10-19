@@ -26,6 +26,14 @@ pnpm exec wrangler deploy --config wrangler.local.jsonc
 
 Migration 僅套用未執行檔案，不刪除或重建資料庫。既有正式環境保留原 Secret、資料庫及管理員，不要重跑首次建立帳密流程。RATE_LIMIT_SECRET 同時衍生 Session token，正式上線後必須保持穩定；只存 Cloudflare Secret，本機測試值可放已忽略的 .dev.vars。
 
+### 暱稱不可重複
+
+第一次成功上傳排行榜時固定玩家暱稱，新暱稱不得與其他匿名身分重複；前後空白會移除、Unicode 使用 NFC 正規化，英文字母 A–Z 不分大小寫。重名回傳 `409 NICKNAME_TAKEN`，玩家可以更換暱稱，用原本同一輪的 Session 重試。已固定的玩家仍使用原名，股友金句沿用該名稱。註銷成績、金句或停用身分不會釋放暱稱。
+
+`0017_unique_new_nicknames.sql` 新增查詢索引及資料庫觸發器，阻止同時提交繞過重名檢查；失敗時整批交易回滾，不消耗 Session，也不留下成績或半完成的暱稱。Migration 不改動既有玩家、成績、金句、按讚或其他資料；歷史上已存在的同名身分保留原名，仍可繼續提交，只有新的名稱指派受到限制。這是保留既有玩家資料的相容規則，不會自動幫舊玩家改名。
+
+正式啟用需部署新版 Worker 並套用此 Migration；可先部署 Worker（能讀取原有結構並提示重名），再套用 Migration 補齊並行保護。兩個步驟都完成才算啟用，無需重設 Secret 或管理員。應依專案既有程序先核對目標帳號、資料庫並備份；本機測試不得執行遠端更新。
+
 管理帳密存 D1 的 sf_admin_credentials，salt 為 16 bytes 隨機 hex，password_hash 為 PBKDF2-SHA256 100,000 次的 32 bytes hex。管理員工具從 stdin 讀 JSON，不列印密碼或 SQL；必須指定 --config，遠端還需 --confirm-database 與該設定內的 D1 ID 一致。重設同名帳密會撤銷既有登入，詳見部署教學。
 
 更新行情時從專案根目錄執行 `node backend/tools/build-edition.mjs`。editionId 與 datasetId 沿用原本計算，API 不再寫死，部署時由公開變數注入。需要資料版本改版時協調 Worker 與 Pages 發布。
