@@ -87,3 +87,7 @@ assets/support-hand-reference.webp 取代上一版手部。以使用者提供的
 
 
 2026-10-18：小小韭六表情採核可預覽 v9、認真立繪 v3、十種心情頭像 v2。原 PNG 直接轉為無損 WebP，尺寸及 RGBA 逐像素驗證完全相同，未調整造型、分格、位置或顏色。對應 assets/characters/xiaoxiaojiu/ 的 expressions.webp、serious.webp、moods.webp。
+
+## 關於視窗的韭菜琺瑯收納桶（2026-10-19）
+
+`assets/about-leek-bucket.webp` 採使用者核可的原色髮飾圖案琺瑯桶，移除預覽編號，以內建 imagegen 製作透明圖並無損編碼 WebP。提示詞與來源見 [BUCKET_ASSET.md](BUCKET_ASSET.md)。

@@ -6,7 +6,7 @@ const data=window.TAIGU_DATA,market=TaiguEngine.createMarket(data),eventSystem=T
 const KEY='taigu-warrior.v1',fmt=n=>Math.round(n).toLocaleString('zh-TW'),dollars=n=>'$'+fmt(n),pct=n=>(n>=0?'+':'')+n.toFixed(2)+'%',tone=n=>n>0?'up':n<0?'down':'neutral';
 let incomingShare=new URL(location.href).searchParams.get('record'),shareLoading=false;
 let state=market.fresh('life'),selected='0050',side='buy',tab='holdings',introIndex=0,replay=false,toastTimer,busy=false,resultShown=false,storageFailed=false;
-let creditMode='cash',resettingRecords=false;
+let creditMode='cash',resettingRecords=false,aboutPlaques=null;
 let watchPins=[];try{watchPins=TaiguWatchlist.normalize(JSON.parse(localStorage.getItem(KEY+'.watchPins')||'null'),data);}catch{}
 const playClock=new TaiguPlaytime.Clock();let pageActive=true;
 function syncPlaytime(active=screen==='game'&&pageActive&&!document.hidden&&document.hasFocus()){return playClock.sync(state,active);}
@@ -182,7 +182,7 @@ function renderIntro(){
  img.onerror=()=>{$('introImageStatus').textContent='CG 未能載入，請重新整理網頁。';$('introImageStatus').hidden=false;};
 }
 function closeIntro(){if(!replay){state.opening=false;if(!tutorialProfile[state.mode])state.tutorialPending=true;changed();}$('introDialog').close();syncMusic();if(!replay&&TaiguTutorial.needs(state,tutorialProfile))showTutorial(true);else if(!replay&&state.mode==='life'&&market.beforeStart(state))advance(1);}
-function utility(title,html,view=''){ $('utilityDialog').dataset.view=view;delete $('utilityDialog').dataset.returnToResult;if(busy)playback.stop();previewMode=null;syncMusic();$('utilityTitle').textContent=title;$('utilityContent').innerHTML=html;if(!$('utilityDialog').open)$('utilityDialog').showModal();if(['announcement','updates'].includes(view)&&announcement)TaiguAnnouncements.bindImages($('utilityContent'),announcement);}
+function utility(title,html,view=''){ if(aboutPlaques){aboutPlaques.destroy();aboutPlaques=null;} $('utilityDialog').dataset.view=view;delete $('utilityDialog').dataset.returnToResult;if(busy)playback.stop();previewMode=null;syncMusic();$('utilityTitle').textContent=title;$('utilityContent').innerHTML=html;if(!$('utilityDialog').open)$('utilityDialog').showModal();if(['announcement','updates'].includes(view)&&announcement)TaiguAnnouncements.bindImages($('utilityContent'),announcement);}
 function maybeMotherReminder(){
  if(screen!=='game'||busy||tutorial.active||state.status!=='playing'||document.querySelector('dialog[open]')||market.marginNeedsAction(state)||supportGame.active||supportGame.offering||supportGame.leading)return;
  const notices=market.acknowledgeMotherReminders(state);if(!notices.length)return;save();
@@ -369,7 +369,9 @@ function requestEarlySettlement(){if(!canUseRemote())return;
 }
 function resumeState(loaded){syncPlaytime(false);quantityMode='fixed';state=loaded;lastReply='';resultShown=false;storageFailed=false;$('utilityDialog').close();syncEvent();save();enterGame();}
 function showAbout(){
- utility('關於台股戰士','<div class="about-lead"><span class="about-mark" aria-hidden="true">韭</span><div><h3>台股戰士</h3><p>小韭的第二次開盤 · 原型 '+TaiguCommunity.VERSION+'</p></div></div><p>一個聽過太多明牌的打工人，帶著一百萬元回到 2020 年。這次能不能靠自己的決定，贏過那個只買 0050 的平行人生？</p><dl class="about-facts"><dt>人生模式</dt><dd>跟著事件前進，每次開放三個交易日決定買賣。</dd><dt>自由模式</dt><dd>完成人生模式一輪後解鎖，每個交易日都能操作。</dd><dt>歷史舞台</dt><dd>'+esc(data.start.replaceAll('-','/'))+'—'+esc(data.end.replaceAll('-','/'))+'，搭配真實行情、新聞事件與虛構劇情。</dd><dt>創作方式</dt><dd>本專案使用 AI 輔助開發，包含程式、劇情與美術素材。</dd></dl><div class="about-bottom">進度可在存檔管理中儲存，之後讀取繼續。'+(window.TAIGU_ONLINE_CONFIG.repositoryUrl?'<br><a href="'+esc(window.TAIGU_ONLINE_CONFIG.repositoryUrl)+'" target="_blank" rel="noopener noreferrer">GitHub 專案 ↗</a>':'')+'</div>','about');
+ const version=TaiguCommunity.latest(window.TAIGU_UPDATES)?.version||TaiguCommunity.VERSION;
+ utility('關於《台股戰士 小韭的第二次開盤》','<p>一個聽過太多明牌的打工人，帶著一百萬元回到 2020 年。這次能不能靠自己的決定，贏過那個只買 0050 的平行人生？</p><dl class="about-facts"><dt>人生模式</dt><dd>跟著事件前進，每次開放三個交易日決定買賣。</dd><dt>自由模式</dt><dd>完成人生模式一輪後解鎖，每個交易日都能操作。</dd><dt>歷史舞台</dt><dd>'+esc(data.start.replaceAll('-','/'))+'—'+esc(data.end.replaceAll('-','/'))+'，搭配真實行情、新聞事件與虛構劇情。</dd><dt>創作方式</dt><dd>本專案使用 AI 輔助開發，包含程式、劇情與美術素材。</dd></dl>'+TaiguAboutPlaques.markup({character:TaiguCharacters.get(characterProfile.selected),names:moodNames,avatar:moodAvatar,esc})+'<div class="about-bottom about-repository">'+(window.TAIGU_ONLINE_CONFIG.repositoryUrl?'<a href="'+esc(window.TAIGU_ONLINE_CONFIG.repositoryUrl)+'" target="_blank" rel="noopener noreferrer">GitHub 專案 ↗</a>':'')+'<small class="about-version">原型 '+esc(version)+'</small></div>','about');
+ aboutPlaques=new TaiguAboutPlaques.Scene({element:$('aboutPlaques'),dialog:$('utilityDialog'),storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>{if(!resettingRecords)localStorage.setItem(key,value);}}});
 }
 function showUpdates(){
  const items=(window.TAIGU_UPDATES||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.version.localeCompare(a.version,undefined,{numeric:true}));
@@ -447,7 +449,7 @@ $('marginToggle').onchange=()=>{creditMode=$('marginToggle').checked?'margin':'c
  $('bgmVolume').oninput=()=>music.setVolume(Number($('bgmVolume').value)/100);
  function unlockAudio(e){if(e.target.closest?.('#bgmToggle'))return;if(e.type==='keydown'&&!['Enter',' '].includes(e.key))return;if(!music.unlocked||music.blocked)music.unlock();}
  document.addEventListener('click',unlockAudio,{capture:true});document.addEventListener('keydown',unlockAudio,{capture:true});
- $('utilityDialog').addEventListener('close',()=>{if(shownAnnouncementAt!==null){markAnnouncement(shownAnnouncementAt);shownAnnouncementAt=null;}previewMode=null;syncMusic();setTimeout(tryAnnouncement,0);});
+ $('utilityDialog').addEventListener('close',()=>{if(aboutPlaques){aboutPlaques.destroy();aboutPlaques=null;}if(shownAnnouncementAt!==null){markAnnouncement(shownAnnouncementAt);shownAnnouncementAt=null;}previewMode=null;syncMusic();setTimeout(tryAnnouncement,0);});
  document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',()=>setTimeout(()=>{maybeMarginCall();maybeMotherReminder();},0)));
  $('menuSkills').onclick=$('useSkillsBtn').onclick=showSkills;$('menuAbout').onclick=showAbout;$('menuFeedback').onclick=$('feedbackBtn').onclick=showFeedback;$('menuUpdates').onclick=()=>{showUpdates();checkAnnouncement();};
  renderAnnouncementTicker();
