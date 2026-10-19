@@ -21,7 +21,7 @@ function bindTitleInteraction(element,{click,enter,leave}){
    if(e.isPrimary===false||touch){cancelTouch();blockTouchClick=true;return;}
    blockTouchClick=false;touch={id:e.pointerId,x:e.clientX,y:e.clientY,fired:false,cancelled:false};
    try{element.setPointerCapture?.(e.pointerId);}catch{}
-   timer=root.setTimeout(()=>{timer=null;if(!touch||touch.cancelled)return;touch.fired=true;blockTouchClick=true;enter();},400);
+   timer=root.setTimeout(()=>{timer=null;if(!touch||touch.cancelled)return;touch.fired=true;blockTouchClick=true;enter();},200);
   },
   pointermove:e=>{if(!touch||e.pointerId!==touch.id)return;if(Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>12){touch.cancelled=true;blockTouchClick=true;clearHold();}},
   pointerup:e=>{

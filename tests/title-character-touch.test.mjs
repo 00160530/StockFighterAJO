@@ -21,24 +21,24 @@ test('desktop hover, leave, native click and keyboard activation keep their orig
  assert.deepEqual(a.calls,['enter','leave','click','click']);assert.equal(down.defaultPrevented,false);assert.equal(click.defaultPrevented,false);assert.equal(a.pending.size,0);assert.equal(a.element.emit('contextmenu',{pointerType:'mouse'}).defaultPrevented,false);
 });
 test('a short touch clears its hold timer and uses exactly one native click without a hover action',()=>{
- const a=setup();a.touch('pointerenter');a.touch('pointerdown');a.tick(399);const up=a.touch('pointerup');a.touch('pointerleave');a.touch('click');a.tick(1000);
+ const a=setup();a.touch('pointerenter');a.touch('pointerdown');a.tick(199);const up=a.touch('pointerup');a.touch('pointerleave');a.touch('click');a.tick(1000);
  assert.deepEqual(a.calls,['click']);assert.equal(up.defaultPrevented,false);assert.equal(a.pending.size,0);
 });
-test('400ms hold calls the shared hover action once; release and touch leave keep its state and suppress generated clicks',()=>{
- const a=setup();a.touch('pointerdown');a.tick(399);assert.deepEqual(a.calls,[]);a.tick(1);assert.deepEqual(a.calls,['enter']);a.tick(800);assert.equal(a.touch('pointerup').defaultPrevented,true);a.touch('pointerleave');
+test('200ms hold calls the shared hover action once; release and touch leave keep its state and suppress generated clicks',()=>{
+ const a=setup();a.touch('pointerdown');a.tick(199);assert.deepEqual(a.calls,[]);a.tick(1);assert.deepEqual(a.calls,['enter']);a.tick(800);assert.equal(a.touch('pointerup').defaultPrevented,true);a.touch('pointerleave');
  assert.equal(a.touch('click').defaultPrevented,true);assert.equal(a.element.emit('click',{detail:1}).defaultPrevented,true);assert.deepEqual(a.calls,['enter']);
  a.touch('pointerdown');a.tick(30);a.touch('pointerup');a.touch('click');assert.deepEqual(a.calls,['enter','click']);
 });
 test('cancel, leaving the target, capture loss and dragging cancel unfinished holds and never turn into a short-tap click',()=>{
  for(const cancel of [a=>a.touch('pointercancel'),a=>a.touch('pointerleave'),a=>a.touch('lostpointercapture'),a=>a.touch('pointermove',{clientX:40})]){
-  const a=setup();a.touch('pointerdown');a.tick(250);cancel(a);a.tick(500);a.touch('pointerup');a.touch('click');assert.deepEqual(a.calls,[]);assert.equal(a.pending.size,0);
+  const a=setup();a.touch('pointerdown');a.tick(100);cancel(a);a.tick(500);a.touch('pointerup');a.touch('click');assert.deepEqual(a.calls,[]);assert.equal(a.pending.size,0);
  }
 });
 test('cancelling after a successful hold never resets the character or allows the compatibility click',()=>{
- const a=setup();a.touch('pointerdown');a.tick(400);a.touch('pointercancel');a.touch('pointerleave');a.touch('click');assert.deepEqual(a.calls,['enter']);
+ const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointercancel');a.touch('pointerleave');a.touch('click');assert.deepEqual(a.calls,['enter']);
 });
 test('touch context menus and selection are blocked while mouse context menus and later desktop clicks still work',()=>{
- const a=setup();a.touch('pointerdown');assert.equal(a.touch('contextmenu').defaultPrevented,true);assert.equal(a.element.emit('selectstart').defaultPrevented,true);a.tick(400);a.touch('pointerup');assert.equal(a.element.emit('contextmenu').defaultPrevented,true);
+ const a=setup();a.touch('pointerdown');assert.equal(a.touch('contextmenu').defaultPrevented,true);assert.equal(a.element.emit('selectstart').defaultPrevented,true);a.tick(200);a.touch('pointerup');assert.equal(a.element.emit('contextmenu').defaultPrevented,true);
  a.element.emit('pointerdown',{pointerType:'mouse'});assert.equal(a.element.emit('contextmenu',{pointerType:'mouse'}).defaultPrevented,false);a.element.emit('click');assert.deepEqual(a.calls,['enter','click']);
 });
 test('backgrounding, window blur, multi-touch and disposal clear pending timers',()=>{
@@ -47,5 +47,5 @@ test('backgrounding, window blur, multi-touch and disposal clear pending timers'
  }
 });
 test('a completed touch does not swallow keyboard clicks or start hold timers for pen input',()=>{
- const a=setup();a.touch('pointerdown');a.tick(400);a.touch('pointerup');a.element.emit('click',{detail:0});a.element.emit('pointerdown',{pointerType:'pen'});a.tick(800);a.element.emit('pointerenter',{pointerType:'pen'});a.element.emit('pointerleave',{pointerType:'pen'});a.element.emit('click',{pointerType:'pen'});assert.deepEqual(a.calls,['enter','click','enter','leave','click']);assert.equal(a.pending.size,0);
+ const a=setup();a.touch('pointerdown');a.tick(200);a.touch('pointerup');a.element.emit('click',{detail:0});a.element.emit('pointerdown',{pointerType:'pen'});a.tick(800);a.element.emit('pointerenter',{pointerType:'pen'});a.element.emit('pointerleave',{pointerType:'pen'});a.element.emit('click',{pointerType:'pen'});assert.deepEqual(a.calls,['enter','click','enter','leave','click']);assert.equal(a.pending.size,0);
 });
