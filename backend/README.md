@@ -2,6 +2,14 @@
 
 # Cloudflare 排行榜與回報 API
 
+## 公告圖片及每天提醒
+
+公告管理可填寫選用的 `imageUrl`（HTTPS 圖床圖片網址或 Google 雲端單一圖片的分享連結），並切換 `repeatDaily`。圖片留空即為純文字公告；有圖片時可在遊戲公告與「更新及公告」中點圖放大。Google 雲端分享請選「知道連結的任何人」可檢視，且須使用圖片檔案，不能是資料夾或 Google 文件；分享連結的 `resourcekey` 會保留。外部圖片若受分享權限、圖床防盜連或流量限制，會顯示原始連結供玩家另開查看，文字公告仍可閱讀。
+
+`repeatDaily=true` 時，同一瀏覽器每天依台灣日期（UTC+8）提醒一次；關閉時維持每次發布只提醒一次。顯示彈窗即記錄當日已看過，重新整理或同一天回首頁不重複跳出；跨日回首頁會再次提醒。查看「更新及公告」也算已閱讀。再次發布會更新發布時間，並視為新公告。
+
+`GET /v1/announcement`、`GET /admin/api/announcement` 回傳 `imageUrl` 與 `repeatDaily`。管理寫入沿用登入及同源驗證，`POST /admin/api/announcement` 可一併設定兩個欄位；舊版管理介面沒有送出新欄位時，保留原有圖片及提醒設定。`0018_announcement_images_and_daily.sql` 只新增欄位，舊公告預設無圖片且不每天提醒，原文、發布時間及管理員資料不變。正式更新時先套用 Migration，再部署 Worker，最後更新前端；舊版 Worker 能在新增欄位後繼續讀寫。
+
 這是遊戲的獨立 Worker 後端，D1 綁定保持 `DB`。每個部署者應建立自己的 Worker、D1 與管理員，不會從 Fork 自動取得雲端資源。
 
 完整步驟與所有參數請讀 [部署教學](../docs/DEPLOYMENT.md)。公開的 `wrangler.jsonc` 和 `wrangler.example.jsonc` 只有示意值；複製範本為已忽略的 `wrangler.local.jsonc` 後填寫自己的 Account ID、Worker、D1 與 ALLOWED_ORIGINS。管理後台是你自己的 API 基底網址後接 `/admin`，使用自己的管理帳密登入。

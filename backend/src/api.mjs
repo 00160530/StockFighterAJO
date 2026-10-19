@@ -1,3 +1,4 @@
+import {readAnnouncement,publishAnnouncement} from './announcements.mjs';
 import {quoteList,quoteBoards,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
@@ -125,8 +126,8 @@ async function admin(request,env,url,body,now,assets){
  const actor=await adminIdentity(request,env,now);const quotesResponse=await quotesAdmin(request,env,url,body,now,actor);if(quotesResponse)return quotesResponse;const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
  if(request.method==='GET'&&url.pathname==='/admin/api/me')return json({username:actor});
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
- if(request.method==='GET'&&url.pathname==='/admin/api/announcement'){const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null});}
-  if(request.method==='POST'&&url.pathname==='/admin/api/announcement'){exactKeys(body,['title','body']);const title=text(body.title,1,60,'公告標題'),content=text(body.body,1,2000,'公告內容',true),at=Date.now();const row=await stmt(env,'INSERT INTO sf_announcement(id,title,body,published_at,updated_by) VALUES (1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,body=excluded.body,published_at=MAX(sf_announcement.published_at+1,excluded.published_at),updated_by=excluded.updated_by RETURNING title,body,published_at',title,content,at,actor).first();return json({published:true,announcement:{title:row.title,body:row.body,publishedAt:row.published_at}});}
+ if(request.method==='GET'&&url.pathname==='/admin/api/announcement')return json({announcement:await readAnnouncement(env)});
+ if(request.method==='POST'&&url.pathname==='/admin/api/announcement')return json({published:true,announcement:await publishAnnouncement(env,body,actor)});
   if(request.method==='GET'&&url.pathname==='/admin/api/overview'){
   const count=await stmt(env,"SELECT (SELECT COUNT(*) FROM sf_feedback WHERE status='new') AS unread,(SELECT COUNT(*) FROM sf_feedback) AS feedback,(SELECT COUNT(*) FROM sf_runs WHERE hidden=0) AS runs,(SELECT COUNT(*) FROM sf_players) AS players").first();return json({actor,...count,edition:EDITION});
  }
@@ -173,7 +174,7 @@ export async function handle(request,env,ctx={},assets={}){
    if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);return json({completions:await lifeCounts(env),poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
-   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const row=await stmt(env,'SELECT title,body,published_at FROM sf_announcement WHERE id=1').first();return json({announcement:row?{title:row.title,body:row.body,publishedAt:row.published_at}:null},200,cors);}
+   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);return json({announcement:await readAnnouncement(env)},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',p).first();return json({nickname:profile?.nickname||null},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/boards'){
    await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;

@@ -36,3 +36,27 @@
 #utilityContent .stock-quote.stock-quote-own{background:#e6f2ea;border-color:#8db49a;box-shadow:inset 3px 0 #527f61}.quote-you{white-space:nowrap;color:#416d52;font-weight:700}
 
 .quote-compose-dialog #quoteComposeStatus:empty{display:none}
+.announcement-media{margin:14px 0 0;min-width:0}
+.announcement-media [hidden],.announcement-image-dialog [hidden]{display:none!important}
+.announcement-image-button{display:block;width:100%;padding:0;border:1px solid #d5e4dc;border-radius:10px;overflow:hidden;background:#edf4ef;cursor:zoom-in}
+.announcement-image-button img{display:block;width:100%;max-height:48dvh;object-fit:contain}
+.announcement-media figcaption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;color:#799084}
+.announcement-media a,.announcement-image-actions a{color:#456f5a;overflow-wrap:anywhere}
+.announcement-image-error{font-size:12px;color:#92614f}
+.utility-dialog[data-view=announcement]{max-height:92dvh;overflow:hidden}
+.utility-dialog[data-view=announcement][open]{display:flex;flex-direction:column}
+.utility-dialog[data-view=announcement]>.dialog-heading{position:static;flex:0 0 auto}
+.utility-dialog[data-view=announcement] #utilityContent{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+.announcement-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding:16px 20px}
+.utility-dialog[data-view=announcement] .announcement-actions{flex:0 0 auto;margin:0;padding:12px 20px;border-top:1px solid #dbe7df;background:#fcfefd}
+.announcement-image-dialog{width:min(1200px,96vw);max-width:96vw;max-height:94dvh;padding:0;border:1px solid #d5e4dc;border-radius:12px;overflow:hidden;background:#fcfefd;color:#244c3d}
+.announcement-image-dialog[open]{display:flex;flex-direction:column}
+.announcement-image-dialog::backdrop{background:#102d27c9;backdrop-filter:blur(5px)}
+.announcement-image-dialog>.dialog-heading{position:static;flex:0 0 auto;padding:12px 18px}
+.announcement-image-dialog h2{font-size:17px;overflow-wrap:anywhere}
+.announcement-image-dialog .dialog-heading button{flex:none;font-size:25px;line-height:1;padding:7px 12px}
+.announcement-image-stage{display:grid;place-items:center;min-height:0;overflow:auto;padding:10px;background:#eaf1ed;overscroll-behavior:contain;touch-action:pan-x pan-y pinch-zoom}
+.announcement-image-stage img{display:block;max-width:100%;max-height:calc(94dvh - 145px);width:auto;height:auto;object-fit:contain}
+.announcement-image-stage p{padding:20px;line-height:1.7}
+.announcement-image-actions{flex:0 0 auto;padding:10px 18px;font-size:12px;text-align:right}
+@media(max-width:650px){.announcement-scroll{padding:12px 14px}.utility-dialog[data-view=announcement] .announcement-actions{padding:10px 14px}.announcement-image-dialog>.dialog-heading{padding:10px 12px}.announcement-image-dialog h2{font-size:15px}.announcement-image-stage{padding:5px}}
