@@ -17,7 +17,13 @@
 @media(max-width:650px){.about-plaque{padding:1px;border-radius:5px}.about-plaque-home{border-radius:5px}}
 @media(prefers-reduced-motion:reduce){.about-plaque-home{transition:none}}
 
-.about-repository{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.about-repository{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.about-socials{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px}
+.about-social-item{display:inline-flex;align-items:center;gap:6px;min-height:24px;white-space:nowrap}
+.about-social-icon{width:18px;height:18px;flex:none;fill:currentColor}
+.about-bottom a.about-social-item{text-decoration:none}
+.about-bottom a.about-social-item:hover span{text-decoration:underline;text-underline-offset:3px}
+.about-social-item.is-pending{color:#728779;cursor:default}
 .about-version{margin-left:auto;font-size:10px;color:#829286;white-space:nowrap}
 
 .about-plaque-bucket{position:absolute;pointer-events:none;z-index:12;transform-origin:center bottom;transition:filter .15s,transform .15s}

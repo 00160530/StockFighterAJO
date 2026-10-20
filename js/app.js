@@ -372,8 +372,13 @@ function requestEarlySettlement(){if(!canUseRemote())return;
 }
 function resumeState(loaded){syncPlaytime(false);quantityMode='fixed';state=loaded;lastReply='';resultShown=false;storageFailed=false;$('utilityDialog').close();syncEvent();save();enterGame();}
 function showAbout(){
- const version=versionText();
- utility('關於《台股戰士 小韭的第二次開盤》','<p>一個聽過太多明牌的打工人，帶著一百萬元回到 2020 年。這次能不能靠自己的決定，贏過那個只買 0050 的平行人生？</p><dl class="about-facts"><dt>人生模式</dt><dd>跟著事件前進，每次開放三個交易日決定買賣。</dd><dt>自由模式</dt><dd>完成人生模式一輪後解鎖，每個交易日都能操作。</dd><dt>歷史舞台</dt><dd>'+esc(data.start.replaceAll('-','/'))+'—'+esc(data.end.replaceAll('-','/'))+'，搭配真實行情、新聞事件與虛構劇情。</dd><dt>創作方式</dt><dd>本專案使用 AI 輔助開發，包含程式、劇情與美術素材。</dd></dl>'+TaiguAboutPlaques.markup({character:TaiguCharacters.get(characterProfile.selected),names:moodNames,avatar:moodAvatar,esc})+'<div class="about-bottom about-repository">'+(window.TAIGU_ONLINE_CONFIG.repositoryUrl?'<a href="'+esc(window.TAIGU_ONLINE_CONFIG.repositoryUrl)+'" target="_blank" rel="noopener noreferrer">GitHub 專案 ↗</a>':'')+'<small class="about-version">'+esc(version)+'</small></div>','about');
+ const version=versionText(),repository=window.TAIGU_ONLINE_CONFIG.repositoryUrl;
+ const socialIcon=name=>'<svg class="about-social-icon" aria-hidden="true" focusable="false"><use href="assets/about-social-icons.svg#'+name+'"></use></svg>';
+ const githubLabel=socialIcon('github')+'<span>GitHub</span>';
+ const github=repository?'<a class="about-social-item" href="'+esc(repository)+'" target="_blank" rel="noopener noreferrer">'+githubLabel+'</a>':'<span class="about-social-item">'+githubLabel+'</span>';
+ const socials='<div class="about-socials">'+github+'<span class="about-social-item is-pending" aria-disabled="true" title="Threads 連結尚未設定">'+socialIcon('threads')+'<span>Threads</span></span></div>';
+
+ utility('關於《台股戰士 小韭的第二次開盤》','<p>一個聽過太多明牌的打工人，帶著一百萬元回到 2020 年。這次能不能靠自己的決定，贏過那個只買 0050 的平行人生？</p><dl class="about-facts"><dt>人生模式</dt><dd>跟著事件前進，每次開放三個交易日決定買賣。</dd><dt>自由模式</dt><dd>完成人生模式一輪後解鎖，每個交易日都能操作。</dd><dt>歷史舞台</dt><dd>'+esc(data.start.replaceAll('-','/'))+'—'+esc(data.end.replaceAll('-','/'))+'，搭配真實行情、新聞事件與虛構劇情。</dd><dt>創作方式</dt><dd>本專案使用 AI 輔助開發，包含程式、劇情與美術素材。</dd></dl>'+TaiguAboutPlaques.markup({character:TaiguCharacters.get(characterProfile.selected),names:moodNames,avatar:moodAvatar,esc})+'<div class="about-bottom about-repository">'+socials+'<small class="about-version">'+esc(version)+'</small></div>','about');
  aboutPlaques=new TaiguAboutPlaques.Scene({element:$('aboutPlaques'),dialog:$('utilityDialog'),storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>{if(!resettingRecords)localStorage.setItem(key,value);}}});
 }
 function showUpdates(){
