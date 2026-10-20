@@ -3,6 +3,7 @@ import {readUpdates,saveUpdate,deleteUpdate} from './update-announcements.mjs';
 import {quoteList,quoteBoards,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
+import {listPlayers} from './players.mjs';
 import {validateSharedRecord} from './shares.mjs';
 import {EDITION} from './edition.mjs';
 import {adminIdentity,adminLogin,adminLogout} from './admin-auth.mjs';
@@ -126,6 +127,7 @@ async function admin(request,env,url,body,now,assets){
  if(request.method==='POST'&&url.pathname==='/admin/api/login'){const r=await adminLogin(request,env,body,now);return json({username:r.username},200,{'Set-Cookie':r.cookie});}
  const actor=await adminIdentity(request,env,now);const quotesResponse=await quotesAdmin(request,env,url,body,now,actor);if(quotesResponse)return quotesResponse;const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
  if(request.method==='GET'&&url.pathname==='/admin/api/me')return json({username:actor});
+ if(request.method==='GET'&&url.pathname==='/admin/api/players')return json(await listPlayers(env,url.searchParams));
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
  if(request.method==='GET'&&url.pathname==='/admin/api/announcement')return json({announcement:await readAnnouncement(env)});
  if(request.method==='POST'&&url.pathname==='/admin/api/announcement')return json({published:true,announcement:await publishAnnouncement(env,body,actor)});
@@ -172,7 +174,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.22'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.23'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -195,7 +197,7 @@ export async function handle(request,env,ctx={},assets={}){
   const body=await readJson(request);
   let response;
   if(url.pathname==='/v1/players'){
-   exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)',id,await hash(token),now).run();response={playerId:id,playerToken:token};
+   exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at,last_seen_at) VALUES (?,?,?,?)',id,await hash(token),now,now).run();response={playerId:id,playerToken:token};
   }else if(url.pathname==='/v1/sessions'){
    exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(!supportedEditions.includes(body.editionId))fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId),requestedEdition=editionFor(m,'cash',body.editionId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);
    const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+requestedEdition),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,requestedEdition,now,expiresAt,startDate).run();

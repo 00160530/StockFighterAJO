@@ -20,9 +20,9 @@ test('nickname migration keeps historical runs intact and uses the earliest name
 });
 
 test('unique-name migration preserves all legacy records and duplicates while protecting new assignments',()=>{
- let before;
+ let before,after;
  const snapshot=db=>Object.fromEntries(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'sf_%' ORDER BY name").all().map(({name})=>[name,db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()]));
- const {db}=database({beforeMigration(db,name){if(!name.startsWith('0017_'))return;
+ const {db}=database({beforeMigration(db,name){if(name.startsWith('0018_'))after=snapshot(db);if(!name.startsWith('0017_'))return;
   for(const id of ['legacy-one','legacy-two']){
    db.prepare('INSERT INTO sf_players(id,token_hash,created_at,nickname) VALUES (?,?,?,?)').run(id,id,1,'既有同名');
    db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(id,id,id,id,'life','legacy',1,9999999999);
@@ -32,7 +32,8 @@ test('unique-name migration preserves all legacy records and duplicates while pr
   db.prepare('INSERT INTO sf_stock_quote_likes VALUES (?,?,?)').run('legacy-one','legacy-two',3);
   before=snapshot(db);
  }});
- const after=snapshot(db);assert.deepEqual(Object.fromEntries(Object.keys(before).map(name=>[name,after[name]])),before);
+ // Compare immediately after 0017, before later additive migrations add columns.
+ assert.deepEqual(after,before);
  db.prepare('UPDATE sf_players SET nickname=nickname,banned=1 WHERE id=?').run('legacy-one');
  db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run('new','new',1);
  assert.throws(()=>db.prepare('UPDATE sf_players SET nickname=? WHERE id=?').run('既有同名','new'),/SF_NICKNAME_TAKEN/);
