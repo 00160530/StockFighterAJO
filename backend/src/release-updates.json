@@ -1,5 +1,15 @@
 [
   {
+    "id": "0.16.27",
+    "version": "0.16.27",
+    "date": "2026-10-20",
+    "title": "關於視窗加入 Threads 連結",
+    "summary": "關於視窗的 Threads 圖示與文字可開啟作者帳號。",
+    "details": [
+      "關於視窗的 Threads 圖示與文字連結至 https://www.threads.com/@wukun009，另開分頁查看。"
+    ]
+  },
+  {
     "id": "0.16.26",
     "version": "0.16.26",
     "date": "2026-10-20",
