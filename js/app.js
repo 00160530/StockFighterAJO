@@ -238,7 +238,7 @@ function renderTitle(){
  $('shareBest').disabled=!best;$('bestRunValue').textContent=best?(best.alpha>=0?'+':'')+best.alpha.toFixed(2)+' 百分點':'等你寫下第一個結局';$('bestRunNote').textContent=best?`${best.status==='won'?'成功超越 0050':'已完成一輪'} · 總資產 ${dollars(best.equity)}`:'依完整一輪的超額報酬比較。';
 }
 function highlightsHTML(r){
- const amount=n=>'$'+n.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2});
+ const amount=dollars;
  const signed=n=>(n>=0?'+':'−')+amount(Math.abs(n));
  const ready=r.statsVersion===1&&r.statsComplete;
  const card=(trade,title,empty)=>`<article class="highlight-card"><span>${title}</span>${trade?`<strong class="${tone(trade.pnl)}">${signed(trade.pnl)}</strong><b>${esc(data.instruments[trade.id]?.name||trade.id)} <small>${esc(trade.id)}</small></b><p>${esc(trade.date)} · 賣出 ${fmt(trade.qty)} 股<br>成交 ${trade.price.toFixed(2)} 元 · 淨報酬 ${pct(trade.returnPct)}</p><small>分攤成本 ${amount(trade.costBasis)}<br>賣出實收 ${amount(trade.proceeds)}</small>`:`<strong class="highlight-empty">${ready?empty:'尚無可重建明細'}</strong><p>${ready?'完成賣出後自動記錄。':'舊版摘要未保留明細；若仍有該輪存檔，讀取後可重新計算。'}</p>`}</article>`;

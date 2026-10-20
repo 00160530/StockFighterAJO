@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id),labels={new:'新回報',read:'已讀',pl
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function time(n){return new Date(n*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});}
 function duration(ms){if(ms===null||ms===undefined)return '尚無紀錄';const seconds=Math.floor(ms/1000),h=Math.floor(seconds/3600),m=Math.floor(seconds%3600/60),s=seconds%60;return (h?h+' 小時 ':'')+(m?m+' 分 ':'')+s+' 秒';}
-function money(c){return '$'+(c/100).toLocaleString('zh-TW',{maximumFractionDigits:2});}
+function money(c){return '$'+Math.round(c/100).toLocaleString('zh-TW');}
 async function api(path,data){const response=await fetch('/admin/api/'+path,{method:data?'POST':'GET',credentials:'same-origin',headers:data?{'Content-Type':'application/json','X-Admin-Action':'1'}:{},...(data?{body:JSON.stringify(data)}:{})});let body;try{body=await response.json();}catch{throw Error('登入可能已過期，請重新整理並登入。');}if(!response.ok){const e=Error(body.error?.message||'暫時無法取得資料。');e.code=body.error?.code;if(e.code==='ADMIN_LOGIN_REQUIRED')showLogin();throw e;}return body;}
 function message(t,error=false){$('message').textContent=t;$('message').className=error?'error':'';}
 function saved(t){message(t);window.alert(t);}
