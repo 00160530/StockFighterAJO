@@ -15,7 +15,7 @@ export function buildPages({root=project,target=path.join(root,'work/pages'),env
   const info=fs.lstatSync(p),relative=path.relative(root,p).split(path.sep).join('/');
   if(info.isSymbolicLink()||relative.split('/').some(n=>n.startsWith('.')||['backend','node_modules','work'].includes(n)||/\.(?:local|private|example)\./.test(n)))return false;
   if(info.isDirectory())return true;
-  if(relative.startsWith('js/'))return path.extname(p)==='.js';
+  if(relative.startsWith('js/'))return path.extname(p)==='.js'||['js/vendor/exceljs.LICENSE','js/vendor/README.md'].includes(relative);
   if(relative.startsWith('css/'))return path.extname(p)==='.css';
   if(relative.startsWith('Art/'))return /\.(html|css|js|json|txt|png|webp|jpg|jpeg|gif|svg)$/.test(p);
   return /\.(png|webp|svg|wav|mp3|ogg)$/.test(p)||['assets/audio/manifest.json','assets/audio/scores.json'].includes(relative);

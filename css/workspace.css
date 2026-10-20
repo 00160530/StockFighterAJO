@@ -242,6 +242,9 @@
 .history-entry-values strong{font:650 20px ui-monospace,monospace}.history-entry-values>span{font-size:12px}
 .run-history-entry small{font-size:10px;color:#7a8e80}
 @media(max-width:650px){.run-history-entry{padding:11px}.history-entry-values strong{font-size:18px}}
+.run-history-entry .history-entry-details{display:grid;gap:5px;width:100%;min-width:0;padding:0;text-align:left;line-height:inherit;color:inherit}
+.history-entry-actions{display:flex;justify-content:flex-end;margin-top:3px}
+.history-entry-actions .secondary{padding:6px 10px;border:1px solid #c1d8c8;border-radius:6px;font-size:12px}
 .online-submit-form input[readonly]{background:#edf3ef;color:#466451;cursor:default}
 .utility-dialog[data-view=result]{height:min(820px,94dvh);max-height:94dvh;overflow:hidden}
 .utility-dialog[data-view=result][open]{display:flex;flex-direction:column}
@@ -260,4 +263,28 @@
 @media(max-width:600px){
  .utility-dialog[data-view=early-confirm] .journey-scroll{padding:12px 14px}
  .utility-dialog[data-view=early-confirm] .journey-actions{padding:10px 14px;gap:8px}
+}
+
+/* Fit within the existing input row without increasing its height. */
+.quantity-label{display:flex;align-items:center;gap:6px;min-width:0}
+#clearQty{flex:0 0 auto;margin:0;padding:1px 5px;border:1px solid #c9dcd0;border-radius:4px;background:#f3f8f5;color:#5f7d6a;font:10px/1 system-ui,"Microsoft JhengHei",sans-serif;white-space:nowrap}
+
+/* Keep holdings and pending orders in the same table layout at every screen size. */
+#gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]){min-width:0;overflow:auto;overscroll-behavior:contain}
+#gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) .table-scroll{width:max-content;min-width:100%;overflow:visible}
+#gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) th{padding:6px 12px}
+#gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td{padding:8px 12px}
+@media(min-width:1000px){
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) table{display:table;min-width:100%;width:100%;border-collapse:collapse;white-space:nowrap;font-size:10px}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) thead{display:table-header-group}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) tbody{display:table-row-group;padding:0}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) tr{display:table-row;padding:0}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) th{padding:5px 4px;font-size:9px}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td{display:table-cell;padding:7px 4px;border-top:1px solid #f0f3e9;text-align:right;white-space:nowrap;font-size:10px}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td:first-child{text-align:left}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td:first-child strong{display:block;font-size:10px}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td:first-child small{display:block;margin:3px 0 0;font-size:8px}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td::before{content:none}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td:nth-child(5) br{display:inline}
+ #gameShell #portfolioContent:is([data-view=holdings],[data-view=orders]) td:nth-child(5) small{margin:0}
 }
