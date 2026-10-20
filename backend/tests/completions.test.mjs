@@ -14,6 +14,35 @@ function setup(DB=database()){
 function bankrupt(s,extra={}){return {sessionId:s.sessionId,sessionToken:s.sessionToken,editionId:EDITION.id,mode:s.mode,outcome:'bankrupt',date:'2020-01-03',startDate:EDITION.start,customStartDate:null,earlySettlementDate:null,dateJumps:[],sessions:2,equityCents:0,benchmarkCents:100000000,cashCents:0,...extra};}
 function score(s,outcome='won'){const equity=outcome==='won'?600000000:100000000;return {sessionId:s.sessionId,sessionToken:s.sessionToken,editionId:EDITION.id,mode:s.mode,nickname:'測試小韭',outcome,date:EDITION.datasetEnd,sessions:EDITION.sessions,equityCents:equity,benchmarkCents:EDITION.benchmarkCents,cashCents:100,score:Math.round((equity-EDITION.benchmarkCents)/10000),drawdownBps:100,trades:2,buyTrades:1,sellTrades:1,maxGain:null,maxLoss:null};}
 
+test('completion duration is retained for wins, losses and bankruptcy in either mode, including zero and partial timing',async()=>{
+ const a=setup();let who;
+ for(const [mode,status,ms,partial] of [['life','won',120500,false],['free','lost',0,false],['life','bankrupt',2345,true],['free','bankrupt',123456,false]]){
+  const run=await a.start(mode,who);who=run.who;const body={...(status==='bankrupt'?bankrupt(run.s):score(run.s,status)),playTimeMs:ms,playTimePartial:partial};assert.equal((await a.call('/v1/completions',body,who)).status,200);
+  const read=()=>a.DB.db.prepare('SELECT play_time_ms,play_time_partial FROM sf_life_completions WHERE session_id=?').get(run.s.sessionId);assert.equal(read().play_time_ms,ms);assert.equal(read().play_time_partial,Number(partial));
+  assert.equal((await a.call('/v1/completions',{...body,playTimeMs:ms+1000},who)).status,200);assert.equal(read().play_time_ms,ms);
+ }
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_runs').get().n,0);assert.deepEqual((await a.call('/v1/community')).data.completions,{total:4,wins:1});
+});
+
+test('duration validation rejects malformed and impossible values; missing legacy timing stays unknown',async()=>{
+ const a=setup(),{who,s}=await a.start('life');
+ for(const base of [bankrupt(s),score(s)])for(const timing of [{playTimeMs:-1},{playTimeMs:1.5},{playTimeMs:'1000'},{playTimeMs:999999999},{playTimeMs:1000,playTimePartial:'yes'}])assert.equal((await a.call('/v1/completions',{...base,...timing},who)).status,400);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,0);assert.equal((await a.call('/v1/completions',bankrupt(s),who)).status,200);
+ const row=a.DB.db.prepare('SELECT play_time_ms,play_time_partial FROM sf_life_completions').get();assert.equal(row.play_time_ms,null);assert.equal(row.play_time_partial,null);
+});
+
+test('new upload fallback captures recorded duration but never fills or overwrites an existing completion',async()=>{
+ const a=setup(),first=await a.start('life'),body={...score(first.s),playTimeMs:90500,playTimePartial:true};delete body.cashCents;assert.equal((await a.call('/v1/scores',body,first.who)).status,200);
+ const firstRow=a.DB.db.prepare('SELECT play_time_ms,play_time_partial FROM sf_life_completions WHERE session_id=?').get(first.s.sessionId);assert.equal(firstRow.play_time_ms,90500);assert.equal(firstRow.play_time_partial,1);
+ const second=await a.start('free',first.who);await a.call('/v1/completions',score(second.s,'lost'),first.who);const uploaded={...score(second.s,'lost'),playTimeMs:123000};delete uploaded.cashCents;assert.equal((await a.call('/v1/scores',uploaded,first.who)).status,200);assert.equal(a.DB.db.prepare('SELECT play_time_ms FROM sf_life_completions WHERE session_id=?').get(second.s.sessionId).play_time_ms,null);
+});
+
+test('playtime migration leaves every historical completion unknown even when its upload has known duration',()=>{
+ const DB=database({beforeMigration(db,name){if(!name.startsWith('0023_'))return;db.exec("INSERT INTO sf_players(id,token_hash,created_at) VALUES ('old-player','old-secret',1);INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES ('old-session','old-player','old-session','old-token','life','old',1,9999999999);INSERT INTO sf_life_completions(session_id,player_id,outcome,created_at) VALUES ('old-session','old-player','won',123);INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,highlights,submitted_at,play_time_ms) VALUES ('old-run','old-session','old-player','old','life','舊玩家','won',1,600000000,549957181,0,0,'{}',100,90500)");}});
+ const row=DB.db.prepare('SELECT * FROM sf_life_completions').get();assert.equal(row.session_id,'old-session');assert.equal(row.created_at,123);assert.equal(row.outcome,'won');assert.equal(row.play_time_ms,null);assert.equal(row.play_time_partial,null);
+ assert.throws(()=>DB.db.prepare('UPDATE sf_life_completions SET play_time_ms=-1').run(),/CHECK/);assert.throws(()=>DB.db.prepare('UPDATE sf_life_completions SET play_time_ms=1.5').run(),/CHECK/);
+});
+
 test('both modes count completed wins, losses, early settlement and insolvency once per player without an upload',async()=>{
  const a=setup(),first=await a.start('life'),who=first.who;
  assert.equal((await a.call('/v1/completions',score(first.s),who)).status,200);
@@ -57,7 +86,7 @@ test('legacy upload date lookup returns only requested local run IDs owned by th
 test('backfill migration preserves completions, player data, moderation and offsets; rerunning does not duplicate',()=>{
  const DB=database({beforeMigration(db,name){if(!name.startsWith('0022_'))return;db.exec("INSERT INTO sf_players(id,token_hash,nickname,created_at) VALUES ('p','private-token','原玩家',123); INSERT INTO sf_community_counters VALUES (1,9,2,10)");
   for(const [id,mode,hidden] of [['life','life',0],['free','free',1]]){db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,\'p\',?,?,?,\'old\',1,9999999999)').run(id,id,id,mode);db.prepare("INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,highlights,submitted_at,hidden) VALUES (?,?,'p','old',?,'原玩家','lost',-1,1,2,0,0,'{}',77,?)").run(id,id,mode,hidden);}
-  db.exec("INSERT INTO sf_life_completions VALUES ('life','p','lost',55)");
+  db.exec("INSERT INTO sf_life_completions(session_id,player_id,outcome,created_at) VALUES ('life','p','lost',55)");
  }});
  DB.db.exec(fs.readFileSync(new URL('../migrations/0022_all_mode_completions.sql',import.meta.url),'utf8'));
  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,2);assert.equal(DB.db.prepare("SELECT created_at FROM sf_life_completions WHERE session_id='life'").get().created_at,55);assert.equal(DB.db.prepare("SELECT created_at FROM sf_life_completions WHERE session_id='free'").get().created_at,77);

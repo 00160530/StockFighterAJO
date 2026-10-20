@@ -28,7 +28,7 @@ test('admin lists every anonymous identity including unnamed zero-upload and ban
  const first=(await a.call('/admin/api/players')).data,second=(await a.call('/admin/api/players?page=1')).data;
  assert.equal(first.total,52);assert.equal(first.items.length,50);assert.equal(first.hasMore,true);assert.equal(second.items.length,2);assert.equal(second.hasMore,false);
  const all=[...first.items,...second.items];assert.equal(new Set(all.map(x=>x.id)).size,52);assert.equal(first.items[0].upload_count,2);assert.equal(all.filter(x=>x.upload_count===0).length,51);assert.equal(all.filter(x=>x.nickname===null).length,51);assert.ok(all.some(x=>x.id==='player-050'));
- for(const row of all)assert.deepEqual(Object.keys(row).sort(),['created_at','free_completed_count','id','last_seen_at','life_completed_count','nickname','upload_count']);
+ for(const row of all)assert.deepEqual(Object.keys(row).sort(),['created_at','free_completed_count','id','last_seen_at','life_completed_count','longest_play_time_ms','nickname','upload_count']);
  assert.deepEqual((await a.call('/admin/api/players')).data,first);
 });
 test('player filters escape wildcard text, combine conditions, and sort by uploads, time or nickname',async()=>{
@@ -70,15 +70,24 @@ test('additive migration keeps historical identities and creation times; last on
 test('admin opens each player count as paginated date-time records, including hidden uploads and non-uploaded completions',async()=>{
  const a=await setup(),id=crypto.randomUUID(),other=crypto.randomUUID();seedPlayer(a.DB,id,'紀錄玩家');seedPlayer(a.DB,other,null);
  seedUpload(a.DB,id,'uploaded-first');seedUpload(a.DB,id,'uploaded-hidden',1);seedUpload(a.DB,other,'other-upload');
- for(let i=0;i<52;i++){const session=crypto.randomUUID(),mode=i===51?'free':'life';a.DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(session,id,session,session,mode,'test-edition',1,9999999999);a.DB.db.prepare('INSERT INTO sf_life_completions VALUES (?,?,?,?)').run(session,id,i%2?'won':'lost',1000+i);}
+ for(let i=0;i<52;i++){const session=crypto.randomUUID(),mode=i===51?'free':'life';a.DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(session,id,session,session,mode,'test-edition',1,9999999999);a.DB.db.prepare('INSERT INTO sf_life_completions(session_id,player_id,outcome,created_at) VALUES (?,?,?,?)').run(session,id,i%2?'won':'lost',1000+i);}
  const path='/admin/api/players/'+id+'/activity',read=async query=>(await a.call(path+'?'+query)).data;
  const life=await read('kind=life'),page2=await read('kind=life&page=1');assert.equal(life.total,51);assert.equal(life.items.length,50);assert.equal(life.hasMore,true);assert.equal(page2.items.length,1);assert.equal(page2.hasMore,false);assert.equal(life.items[0].recorded_at,1050);assert.equal(page2.items[0].recorded_at,1000);assert.equal(new Set([...life.items,...page2.items].map(x=>x.id)).size,51);
  const free=await read('kind=free');assert.equal(free.total,1);assert.equal(free.items[0].recorded_at,1051);assert.equal(free.items[0].mode,'free');
  const uploads=await read('kind=uploads');assert.equal(uploads.total,2);assert.ok(uploads.items.some(r=>r.id==='uploaded-hidden'));assert.ok(!uploads.items.some(r=>r.id==='other-upload'));assert.equal(uploads.items[0].recorded_at,200);
- for(const row of [...life.items,...free.items,...uploads.items])assert.deepEqual(Object.keys(row).sort(),['id','mode','outcome','recorded_at']);assert.deepEqual(Object.keys(life.player).sort(),['id','nickname']);
+ for(const row of [...life.items,...free.items,...uploads.items])assert.deepEqual(Object.keys(row).sort(),['id','mode','outcome','play_time_ms','play_time_partial','recorded_at']);assert.deepEqual(Object.keys(life.player).sort(),['id','nickname']);
  assert.equal((await a.call(path,null,{admin:false})).status,401);
  for(const query of ['kind=bad','kind=life&page=-1','kind=free&page=0.5','kind=uploads&page=10001'])assert.equal((await a.call(path+'?'+query)).status,400);
  assert.equal((await a.call('/admin/api/players/short/activity')).status,400);assert.equal((await a.call('/admin/api/players/'+crypto.randomUUID()+'/activity')).status,404);
  assert.equal((await a.call('/admin/api/players/'+other+'/activity?kind=life')).data.total,0);
  assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,52);
+});
+
+test('player sorting uses each mode completion count and the longest recorded single game, with unknown durations last',async()=>{
+ const a=await setup();for(const id of ['most-life','most-free','longest','unknown','zero'])seedPlayer(a.DB,id,null,100);
+ function completed(player,mode,ms){const id=crypto.randomUUID();a.DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(id,player,id,id,mode,'test-edition',1,9999999999);a.DB.db.prepare('INSERT INTO sf_life_completions(session_id,player_id,outcome,created_at,play_time_ms,play_time_partial) VALUES (?,?,?,?,?,?)').run(id,player,'lost',100,ms,ms===null?null:0);}
+ for(let i=0;i<3;i++)completed('most-life','life',i===0?20000:null);for(let i=0;i<4;i++)completed('most-free','free',10000);completed('longest','life',90000);completed('longest','free',30000);completed('zero','free',0);completed('unknown','life',null);
+ for(const [sort,first] of [['life_completed','most-life'],['free_completed','most-free'],['duration','longest']]){const d=(await a.call('/admin/api/players?sort='+sort)).data;assert.equal(d.items[0].id,first);assert.equal(new Set(d.items.map(r=>r.id)).size,5);}
+ const rows=(await a.call('/admin/api/players?sort=duration')).data.items;assert.equal(rows[0].longest_play_time_ms,90000);assert.equal(rows[0].life_completed_count,1);assert.equal(rows[0].free_completed_count,1);assert.ok(rows.findIndex(r=>r.id==='zero')<rows.findIndex(r=>r.id==='unknown'));assert.equal(rows.at(-1).longest_play_time_ms,null);
+ const id=crypto.randomUUID();seedPlayer(a.DB,id);completed(id,'life',123456);const activity=(await a.call('/admin/api/players/'+id+'/activity?kind=life')).data;assert.equal(activity.items[0].play_time_ms,123456);assert.equal(activity.items[0].play_time_partial,0);assert.equal((await a.call('/admin/api/players/'+id+'/activity?kind=life',null,{admin:false})).status,401);
 });
