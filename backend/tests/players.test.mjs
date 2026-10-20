@@ -28,7 +28,7 @@ test('admin lists every anonymous identity including unnamed zero-upload and ban
  const first=(await a.call('/admin/api/players')).data,second=(await a.call('/admin/api/players?page=1')).data;
  assert.equal(first.total,52);assert.equal(first.items.length,50);assert.equal(first.hasMore,true);assert.equal(second.items.length,2);assert.equal(second.hasMore,false);
  const all=[...first.items,...second.items];assert.equal(new Set(all.map(x=>x.id)).size,52);assert.equal(first.items[0].upload_count,2);assert.equal(all.filter(x=>x.upload_count===0).length,51);assert.equal(all.filter(x=>x.nickname===null).length,51);assert.ok(all.some(x=>x.id==='player-050'));
- for(const row of all)assert.deepEqual(Object.keys(row).sort(),['created_at','id','last_seen_at','nickname','upload_count']);
+ for(const row of all)assert.deepEqual(Object.keys(row).sort(),['created_at','free_completed_count','id','last_seen_at','life_completed_count','nickname','upload_count']);
  assert.deepEqual((await a.call('/admin/api/players')).data,first);
 });
 test('player filters escape wildcard text, combine conditions, and sort by uploads, time or nickname',async()=>{
@@ -65,4 +65,20 @@ test('additive migration keeps historical identities and creation times; last on
  assert.equal(row.id,'old-player');assert.equal(row.nickname,'原玩家');assert.equal(row.created_at,123);assert.equal(row.last_seen_at,null);assert.equal(row.upload_count,0);
  DB.db.prepare('UPDATE sf_players SET token_hash=? WHERE id=?').run(await hash(playerToken),'old-player');await a.call('/v1/profile',null,{admin:false,token:playerToken});
  const updated=DB.db.prepare('SELECT created_at,last_seen_at FROM sf_players WHERE id=?').get('old-player');assert.equal(updated.created_at,123);assert.ok(updated.last_seen_at>123);
+});
+
+test('admin opens each player count as paginated date-time records, including hidden uploads and non-uploaded completions',async()=>{
+ const a=await setup(),id=crypto.randomUUID(),other=crypto.randomUUID();seedPlayer(a.DB,id,'紀錄玩家');seedPlayer(a.DB,other,null);
+ seedUpload(a.DB,id,'uploaded-first');seedUpload(a.DB,id,'uploaded-hidden',1);seedUpload(a.DB,other,'other-upload');
+ for(let i=0;i<52;i++){const session=crypto.randomUUID(),mode=i===51?'free':'life';a.DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(session,id,session,session,mode,'test-edition',1,9999999999);a.DB.db.prepare('INSERT INTO sf_life_completions VALUES (?,?,?,?)').run(session,id,i%2?'won':'lost',1000+i);}
+ const path='/admin/api/players/'+id+'/activity',read=async query=>(await a.call(path+'?'+query)).data;
+ const life=await read('kind=life'),page2=await read('kind=life&page=1');assert.equal(life.total,51);assert.equal(life.items.length,50);assert.equal(life.hasMore,true);assert.equal(page2.items.length,1);assert.equal(page2.hasMore,false);assert.equal(life.items[0].recorded_at,1050);assert.equal(page2.items[0].recorded_at,1000);assert.equal(new Set([...life.items,...page2.items].map(x=>x.id)).size,51);
+ const free=await read('kind=free');assert.equal(free.total,1);assert.equal(free.items[0].recorded_at,1051);assert.equal(free.items[0].mode,'free');
+ const uploads=await read('kind=uploads');assert.equal(uploads.total,2);assert.ok(uploads.items.some(r=>r.id==='uploaded-hidden'));assert.ok(!uploads.items.some(r=>r.id==='other-upload'));assert.equal(uploads.items[0].recorded_at,200);
+ for(const row of [...life.items,...free.items,...uploads.items])assert.deepEqual(Object.keys(row).sort(),['id','mode','outcome','recorded_at']);assert.deepEqual(Object.keys(life.player).sort(),['id','nickname']);
+ assert.equal((await a.call(path,null,{admin:false})).status,401);
+ for(const query of ['kind=bad','kind=life&page=-1','kind=free&page=0.5','kind=uploads&page=10001'])assert.equal((await a.call(path+'?'+query)).status,400);
+ assert.equal((await a.call('/admin/api/players/short/activity')).status,400);assert.equal((await a.call('/admin/api/players/'+crypto.randomUUID()+'/activity')).status,404);
+ assert.equal((await a.call('/admin/api/players/'+other+'/activity?kind=life')).data.total,0);
+ assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,52);
 });

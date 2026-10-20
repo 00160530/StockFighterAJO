@@ -29,3 +29,9 @@ test('in-flight clicks cannot duplicate a vote, and a failed change can be retri
  await buttons[0].onclick();assert.equal(a.calls.length,1);
  fail=false;const retry=buttons[1].onclick();finish();await retry;assert.equal(a.calls.length,2);assert.equal(a.reads,2);assert.match(a.box.html,/你選擇了「不行」/);
 });
+
+test('a slow homepage read cannot replace fresher totals returned by completion reporting',async()=>{
+ let resolveRead;const counts={innerHTML:''},box={innerHTML:'',querySelectorAll:()=>[]},context={document:{getElementById:id=>id==='lifeCommunityCount'?counts:box}};vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../js/community-ui.js',import.meta.url),'utf8'),context);
+ const online={community:()=>new Promise(resolve=>resolveRead=resolve),complete:async()=>({completions:{total:5,wins:1}})},home=Object.assign(Object.create(context.TaiguCommunityUI.Home.prototype),{online,esc:x=>x,pending:new Set(),retry:new Map(),loading:null});
+ const reading=home.refresh();await home.report({id:'free-bankrupt',mode:'free',status:'bankrupt'});resolveRead({completions:{total:4,wins:1},poll:null});await reading;assert.match(counts.innerHTML,/<b>5<\/b>次/);assert.ok(!counts.innerHTML.includes('<b>4</b>'));
+});
