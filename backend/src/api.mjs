@@ -1,6 +1,6 @@
 import {readAnnouncement,publishAnnouncement} from './announcements.mjs';
 import {readUpdates,saveUpdate,deleteUpdate} from './update-announcements.mjs';
-import {quoteList,quoteBoards,createQuote,likeQuote,quotesAdmin} from './quotes.mjs';
+import {quoteList,quoteBoards,createQuote,updateQuote,likeQuote,quotesAdmin} from './quotes.mjs';
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
 import {listPlayers} from './players.mjs';
@@ -174,7 +174,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.24'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.25'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -203,6 +203,7 @@ export async function handle(request,env,ctx={},assets={}){
    const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+requestedEdition),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,requestedEdition,now,expiresAt,startDate).run();
    const saved=await stmt(env,'SELECT id,created_at,expires_at,start_date FROM sf_sessions WHERE player_id=? AND run_id=? AND edition=?',p,run,requestedEdition).first();if((saved.start_date||EDITION.start)!==startDate)fail(409,'SESSION_START_MISMATCH','這輪已使用另一個起始日期建立 Session。');response={sessionId:saved.id,sessionToken:token,createdAt:saved.created_at,expiresAt:saved.expires_at,mode:m,editionId:body.editionId};
   }else if(url.pathname==='/v1/quotes'){response=await createQuote(request,env,body,now,ip);
+  }else if(/^\/v1\/quotes\/[a-zA-Z0-9_-]+\/edit$/.test(url.pathname)){response=await updateQuote(request,env,url.pathname.split('/').at(-2),body,now,ip);
   }else if(/^\/v1\/quotes\/[a-zA-Z0-9_-]+\/like$/.test(url.pathname)){response=await likeQuote(request,env,url.pathname.split('/').at(-2),body,now,ip);
   }else if(/^\/v1\/polls\/[a-zA-Z0-9_-]+\/vote$/.test(url.pathname)){response=await vote(request,env,url.pathname.split('/').at(-2),body,now,ip);
    }else if(url.pathname==='/v1/completions'){

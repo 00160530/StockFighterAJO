@@ -66,7 +66,7 @@ GitHub Actions 只測試並發布前端，不會部署 Worker 或操作 D1。bui
 
 ## 0.12.0 管理功能
 
-`GET /admin/api/runs` 接受 `q`（暱稱部分字串）、`id`（成績完整編號）、`status=all|active|revoked`、`mode=all|life|free`、`financing=all|cash|margin`、`sort=latest|score|equity|duration|trades`、`page`（從 0 起，每頁 50 筆）。LIKE 特殊字元作為字面字元，排序使用白名單，所有值皆為參數綁定。
+`GET /admin/api/runs` 接受 `q`（暱稱部分字串）、`id`（成績完整編號）、`status=all|active|revoked|modified`、`mode=all|life|free`、`financing=all|cash|margin`、`sort=latest|score|equity|duration|trades`、`page`（從 0 起，每頁 50 筆）。LIKE 特殊字元作為字面字元，排序使用白名單，所有值皆為參數綁定。
 
 `POST /admin/api/runs/:id/hide` 註銷；`POST /admin/api/runs/:id/restore` 恢復。皆須 2–500 字原因、管理 cookie、同源 Origin 與 X-Admin-Action。使用 D1 batch 原子更新成績、重選該玩家與版本的三種最佳成績，並留下稽核紀錄，不刪除原始成績。
 
@@ -111,10 +111,22 @@ GitHub Actions 只測試並發布前端，不會部署 Worker 或操作 D1。bui
 
 `0016_quote_authors.sql` 為既有金句新增 `nickname`、`avatar_id`、`avatar_character`；舊金句回填原玩家暱稱（沒有則顯示匿名股友），預設小韭的微笑頭像，保留金句原文、時間、狀態及按讚。
 
-留言接受額外的 `nickname`（同排行榜 2–20 字規則）、`avatarId`（1–10）、`avatarCharacter`（`xiaojiu`／`xiaoxiaojiu`）。已有固定排行榜暱稱必須沿用；尚無排行榜暱稱時，金句暱稱只保存為這則留言的顯示資料，不會替玩家設定排行榜暱稱。舊版只送 `text` 的請求仍能使用預設頭像及原本的排行榜暱稱，或匿名股友。留言成功後不能透過重試改文字、暱稱或頭像。
+留言接受額外的 `nickname`（同排行榜 2–20 字規則）、`avatarId`（1–10）、`avatarCharacter`（`xiaojiu`／`xiaoxiaojiu`）。已有固定排行榜暱稱必須沿用；尚無排行榜暱稱時，金句暱稱只保存為這則留言的顯示資料，不會替玩家設定排行榜暱稱。舊版只送 `text` 的請求仍能使用預設頭像及原本的排行榜暱稱，或匿名股友。新增留言的重試不能覆蓋文字、暱稱或頭像；修改自己的金句使用獨立的 edit API。
 
-`GET /v1/quote-boards` 一次回傳三類金句的前 50 句和自己的資格、留言、按讚狀態。查詢用視窗函式先選出各榜上限，最多回傳 150 個不同候選給 Worker；公開結果不帶玩家 ID、token 或內部排名欄位。前端依匿名 token 暫存 5 分鐘，去重同時讀取，切換頁籤及短時間重開不再請求。留言、按讚、取消按讚成功或送出排行榜成績後使金句快取失效；讀取失敗可重試，舊請求不能覆蓋已失效後的新快取。不新增手動更新按鈕。
+`GET /v1/quote-boards` 一次回傳三類金句的前 50 句和自己的資格、留言、按讚狀態。查詢用視窗函式先選出各榜上限，最多回傳 150 個不同候選給 Worker；公開結果不帶玩家 ID、token 或內部排名欄位。前端依匿名 token 暫存 5 分鐘，去重同時讀取，切換頁籤及短時間重開不再請求。留言、修改、按讚、取消按讚成功或送出排行榜成績後使金句快取失效；修改失敗也使快取失效，以重新取得註銷或版本衝突狀態；讀取失敗可重試，舊請求不能覆蓋已失效後的新快取。不新增手動更新按鈕。
 
-管理查詢 `GET /admin/api/quotes` 增加 `q`（部分金句）、`nickname`（部分顯示暱稱）、`featured=all|yes|no`、`status=all|active|revoked`、`sort=latest|oldest|likes|likes_asc|nickname|updated`；支援同時套用條件及 `page`，回傳篩選後 `total`。部分查詢中的 `%`、`_`、反斜線以字面比對，所有值均綁定參數，排序採白名單。後台以表格呈現，註銷、恢復與精選操作保留當下查詢條件。
+管理查詢 `GET /admin/api/quotes` 增加 `q`（部分金句）、`nickname`（部分顯示暱稱）、`featured=all|yes|no`、`status=all|active|revoked|modified`、`sort=latest|oldest|likes|likes_asc|nickname|updated`；支援同時套用條件及 `page`，回傳篩選後 `total`。部分查詢中的 `%`、`_`、反斜線以字面比對，所有值均綁定參數，排序採白名單。後台以表格呈現，註銷、恢復與精選操作保留當下查詢條件。
 
-管理員可透過 `POST /admin/api/quotes/:id/delete` 與 `{confirm:true}` 永久刪除測試金句。這個操作沿用登入、同源及操作標頭檢查，並以同一筆交易刪除該金句與所有按讚、寫入 `quote-delete` 稽核紀錄。只釋放這位玩家的金句名額，不刪除匿名身分、排行榜成績或通關紀錄；重新留言仍須符合原本資格。玩家重新整理遊戲後會取得更新狀態。註銷仍保留名額，適用不當留言管理。
+管理員可透過 `POST /admin/api/quotes/:id/delete` 與 `{confirm:true}` 永久刪除測試金句。這個操作沿用登入、同源及操作標頭檢查，並以同一筆交易刪除該金句、修改歷史與所有按讚、寫入 `quote-delete` 稽核紀錄。只釋放這位玩家的金句名額，不刪除匿名身分、排行榜成績或通關紀錄；重新留言仍須符合原本資格。玩家重新整理遊戲後會取得更新狀態。註銷仍保留名額，適用不當留言管理。
+
+
+## 金句修改歷史
+
+部署前先套用 `0021_quote_revisions.sql`，再部署 Worker 與前端。既有金句從第 1 版開始，文字、暱稱、時間、狀態、精選及按讚均保留。
+
+- `POST /v1/quotes/:id/edit`：`{text,revision,avatarId,avatarCharacter}`。限作者本人；沿用來源、身分及限頻檢查，文字仍最多 25 個 Unicode 字元，暱稱不可修改。私有 `self` 回傳目前版本及頭像供編輯。
+- 相同內容與頭像重送不增加版本。不同內容必須符合目前 revision；過期回傳 `409 QUOTE_CHANGED`，避免兩個視窗互相覆蓋。
+- 條件更新同時檢查作者、revision、未註銷；資料庫觸發器於同一個原子更新內保存舊文字、頭像、精選、時間與當時按讚數。任何歷史寫入失敗會回滾替換，註銷先完成則不能再改。
+- 目前金句 ID 與按讚保留；修改取消精選，避免新內容自動承接原本的人工精選。原留言時間保留。
+- 歷史內容只由管理員查詢，`status=modified` 顯示舊版本；公開榜單只讀取目前有效內容。「已修改」歷史列不可操作；管理員對目前版本註銷、恢復、精選或永久刪除。
+- 註銷後前後端均禁止修改，訊息為「你的金句已被管理員註銷。」。管理員永久刪除目前金句時，同一交易刪除其歷史與按讚並釋放名額。

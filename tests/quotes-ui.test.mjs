@@ -56,3 +56,7 @@ test('only the authenticated player’s exact quote ID receives the own-row colo
  assert.ok(mine.includes('stock-quote-own'));assert.ok(mine.includes('同一暱稱 <span class="quote-you">(你)</span>'));
  for(const html of [other,anonymous]){assert.ok(!html.includes('stock-quote-own'));assert.ok(!html.includes('quote-you'));}
 });
+
+test('editing uses the existing identity and invalidates cached boards after success or a moderation conflict',async()=>{
+ let revoked=false;const a=cachedClient({fetcher:async(url,options,snapshot)=>url.endsWith('/edit')?(revoked?Response.json({error:{code:'QUOTE_REVOKED',message:'你的金句已被管理員註銷。'}},{status:409}):Response.json({saved:true})):Response.json(snapshot())});a.identity('a');await a.client.quotes();await a.client.updateQuote('quote-123','新金句',{revision:1,avatarId:3,avatarCharacter:'xiaoxiaojiu'});await a.client.quotes('latest');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,2);const edit=a.calls.find(c=>c.url.endsWith('/edit'));assert.equal(edit.options.headers.Authorization,'Bearer '+'a'.repeat(64));assert.deepEqual(JSON.parse(edit.options.body),{text:'新金句',revision:1,avatarId:3,avatarCharacter:'xiaoxiaojiu'});revoked=true;await assert.rejects(a.client.updateQuote('quote-123','再改',{revision:2,avatarId:3,avatarCharacter:'xiaoxiaojiu'}),e=>e.code==='QUOTE_REVOKED');await a.client.quotes('popular');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,3);
+});

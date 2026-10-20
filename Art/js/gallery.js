@@ -21,9 +21,10 @@
   const image=make('img','unreleased-preview');image.src=item.preview;image.alt=item.alt||item.title;image.loading='lazy';card.append(image);
   const actions=make('div','unreleased-actions');
   const replay=make('button','','重新播放');replay.type='button';replay.onclick=()=>image.src=item.preview+'?r='+Date.now();
-  const still=make('button','','定格查看側身');still.type='button';still.onclick=()=>image.src=item.still;
+  const still=make('button','',item.stillLabel||'定格查看動作');still.type='button';still.onclick=()=>image.src=item.still;
   if(item.animated)actions.append(replay);if(item.still)actions.append(still);if(item.bundle)actions.append(link('下載原圖與動畫完整包',item.bundle,true));
   for(const d of item.downloads||[])actions.append(link(d.label,d.url,true));
+  if(item.comparison)actions.append(link(item.comparisonLabel||'查看動作對照',item.comparison));
   card.append(actions,make('p','unreleased-note',item.note||'尚未套用遊戲'));
   const details=make('details');details.append(make('summary','','個別角色動畫與原始圖集'));
   const comparison=make('div','comparison');

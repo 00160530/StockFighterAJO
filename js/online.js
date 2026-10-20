@@ -50,6 +50,7 @@ class Client{
   }
   async quotes(tab='popular'){const d=await this.quoteBoards();if(!d.tabs[tab])throw new CloudError('金句分類不正確。','INVALID_TAB');return {...d.tabs[tab],self:d.self};}
   async createQuote(text,author={}){const p=await this.identity(),result=await this.request('/v1/quotes',{text,...author},p.playerToken);this.invalidateQuotes();return result;}
+  async updateQuote(id,text,author){const p=await this.identity();try{return await this.request('/v1/quotes/'+encodeURIComponent(id)+'/edit',{text,...author},p.playerToken);}finally{this.invalidateQuotes();}}
   async likeQuote(id,liked){const p=await this.identity(),result=await this.request('/v1/quotes/'+encodeURIComponent(id)+'/like',{liked},p.playerToken);this.invalidateQuotes();return result;}
   async announcement(){return this.request('/v1/announcement');}
  async feedback(body){const p=await this.identity();return this.request('/v1/feedback',body,p.playerToken);}
