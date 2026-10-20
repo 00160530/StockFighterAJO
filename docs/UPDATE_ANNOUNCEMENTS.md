@@ -6,7 +6,7 @@
 
 ## 發布流程
 
-1. 照常在 `data/updates.js` 加入新版本公告，使用從未出現過的穩定 `id`。
+1. 在 `CHANGELOG.md` 開頭依版本由新至舊新增更新紀錄，README 只維護目前的遊戲介紹、玩法與技術說明，不再堆放版本歷史。遊戲內需要顯示的更新，同時在 `data/updates.js` 加入新版本公告，使用從未出現過的穩定 `id`。
 2. 執行 `node tools/sync-update-announcements.mjs`，將版本公告同步至 Worker 使用的 `backend/src/release-updates.json`。根目錄 `npm test` 以及範例／標準 Wrangler 設定的 build command 會自動執行此步驟；自訂 Wrangler 設定也需保留該 build command。
 3. 首次上線先套用 D1 migration `0019_update_announcements.sql`，再部署新版 Worker 與遊戲。之後每次新增版本公告也要部署 Worker，不能只更新 Pages；否則線上公告清單會停留在前一版。
 4. Worker 第一次讀取公告時自動匯入所有尚未出現的版本，包含既有歷史紀錄。後台先開或玩家先開皆可完成匯入。
