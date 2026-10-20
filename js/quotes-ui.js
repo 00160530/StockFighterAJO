@@ -9,13 +9,23 @@ function quoteTime(seconds,now=Date.now()){
  return {full,iso:date.toISOString(),label:elapsed<60?'剛剛':elapsed<3600?Math.floor(elapsed/60)+' 分鐘前':elapsed<86400?Math.floor(elapsed/3600)+' 小時前':elapsed<604800?Math.floor(elapsed/86400)+' 天前':date.toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'})};
 }
 function quoteHTML(q,esc,{avatar=()=>'',now=Date.now(),ownId}={}){const time=quoteTime(q.createdAt||1,now),isOwn=!!ownId&&q.id===ownId;return '<article class="stock-quote'+(isOwn?' stock-quote-own':'')+'"><header class="quote-comment-head">'+avatar(q.avatarId||1,q.avatarCharacter||'xiaojiu')+'<div><strong>'+esc(q.nickname||'匿名股友')+(isOwn?' <span class="quote-you">(你)</span>':'')+'</strong><time datetime="'+time.iso+'" title="'+esc(time.full)+'" aria-label="留言時間 '+esc(time.full)+'">'+esc(time.label)+'</time></div>'+(q.featured?'<small>✦ 作者精選</small>':'')+'</header><p class="quote-comment-body">'+esc(q.body)+'</p><div class="stock-quote-meta"><button type="button" class="quote-like" data-quote-like="'+esc(q.id)+'" aria-pressed="'+!!q.liked+'" aria-label="'+(q.liked?'取消按讚':'按讚')+'：'+esc(q.body)+'"><span aria-hidden="true">'+(q.liked?'♥':'♡')+'</span> <b>'+Number(q.likes).toLocaleString('zh-TW')+'</b></button></div></article>';}
+async function saveEdit(online,id,text,author,confirm=message=>root.confirm(message)){
+ if(!await confirm('修改金句後，按讚數會歸零，作者精選也會取消。確定要修改嗎？'))return false;
+ await online.updateQuote(id,text,{...author,confirmResetLikes:true});return true;
+}
 async function open({online,utility,esc,avatar=()=>'',defaultCharacter='xiaojiu'}){
  const prefs=online.read?.()||{};
- let tab=randomTab(),generation=0,draft='',draftName='',sending=false,self={},composeDialog=null,chosenCharacter=['xiaojiu','xiaoxiaojiu'].includes(prefs.quoteAvatarCharacter)?prefs.quoteAvatarCharacter:defaultCharacter,chosenMood=Number.isInteger(prefs.quoteAvatarId)&&prefs.quoteAvatarId>=1&&prefs.quoteAvatarId<=10?prefs.quoteAvatarId:1;
+ let tab=randomTab(),generation=0,draft='',draftName='',sending=false,self={},composeDialog=null,confirmDialog=null,chosenCharacter=['xiaojiu','xiaoxiaojiu'].includes(prefs.quoteAvatarCharacter)?prefs.quoteAvatarCharacter:defaultCharacter,chosenMood=Number.isInteger(prefs.quoteAvatarId)&&prefs.quoteAvatarId>=1&&prefs.quoteAvatarId<=10?prefs.quoteAvatarId:1;
  utility('股友金句','<div class="quotes-intro-row"><p class="quotes-introduction">'+introduction+'</p><button type="button" id="openQuoteComposer" class="secondary" disabled>我也要留言</button></div><div class="quotes-tabs" role="tablist" aria-label="金句分類">'+tabs.map(([id,label])=>'<button type="button" role="tab" id="quotes-tab-'+id+'" data-quotes-tab="'+id+'" aria-controls="quotesList" aria-selected="'+(id===tab)+'">'+label+'</button>').join('')+'</div><p id="quotesStatus" role="status"></p><div id="quotesList" role="tabpanel" tabindex="0" class="quotes-list"></div>','stock-quotes');
  const $=id=>document.getElementById(id),list=$('quotesList'),composeButton=$('openQuoteComposer'),outer=$('utilityDialog'),status=$('quotesStatus'),buttons=[...document.querySelectorAll('[data-quotes-tab]')];
  const alive=()=>list.isConnected&&outer.open&&outer.dataset.view==='stock-quotes';
- function closeComposer(){if(composeDialog?.open)composeDialog.close();}
+ function closeComposer(){if(confirmDialog?.open)confirmDialog.close();if(composeDialog?.open)composeDialog.close();}
+ function confirmModification(text){return new Promise(resolve=>{
+  const prompt=document.createElement('dialog');confirmDialog=prompt;prompt.className='utility-dialog quote-compose-dialog';prompt.setAttribute('aria-labelledby','quoteEditConfirmTitle');
+  prompt.innerHTML='<div class="dialog-heading"><h2 id="quoteEditConfirmTitle">確認修改金句</h2><button type="button" aria-label="關閉確認視窗">×</button></div><div class="quote-composer"><p></p></div><div class="dialog-actions quote-compose-actions"><button type="button" data-edit-cancel>取消</button><button type="button" class="primary" data-edit-confirm>確定修改</button></div>';
+  prompt.querySelector('p').textContent=text;prompt.querySelector('.dialog-heading button').onclick=prompt.querySelector('[data-edit-cancel]').onclick=()=>prompt.close();prompt.querySelector('[data-edit-confirm]').onclick=()=>prompt.close('confirmed');
+  prompt.addEventListener('close',()=>{prompt.remove();confirmDialog=null;resolve(prompt.returnValue==='confirmed');},{once:true});document.body.append(prompt);prompt.showModal();
+ });}
  outer.addEventListener('close',closeComposer,{once:true});
  function compose(){
   if(!alive()||composeDialog||sending)return;
@@ -45,7 +55,7 @@ async function open({online,utility,esc,avatar=()=>'',defaultCharacter='xiaojiu'
   form.querySelectorAll('[data-quote-character]').forEach(b=>b.onclick=()=>{chosenCharacter=b.dataset.quoteCharacter;paintAvatar();update();});paintAvatar();
   const validName=()=>count(name.value)>=2&&count(name.value)<=20&&/^[\p{L}\p{N} _.-]+$/u.test(name.value.normalize('NFC').trim());
   const update=()=>{draft=input.value;draftName=name.value;const n=count(draft);limit.textContent=n+' / 25 字';limit.classList.toggle('quote-over-limit',n>25);submit.disabled=sending||n<1||n>25||!validName()||(editing&&draft.normalize('NFC').trim()===original.body&&chosenMood===original.avatarId&&chosenCharacter===original.avatarCharacter);form.inert=sending;};input.oninput=name.oninput=update;update();
-  form.onsubmit=async e=>{e.preventDefault();if(submit.disabled||sending||count(input.value)<1||count(input.value)>25||!validName())return;sending=true;composeButton.disabled=true;update();message.textContent=editing?'正在儲存修改…':'正在送出金句…';try{const content=input.value.normalize('NFC').trim(),author={avatarId:chosenMood,avatarCharacter:chosenCharacter};if(editing)await online.updateQuote(original.quoteId,content,{...author,revision:original.revision});else await online.createQuote(content,{...author,nickname:name.value.normalize('NFC').trim()});try{const saved=online.read();saved.quoteAvatarId=chosenMood;saved.quoteAvatarCharacter=chosenCharacter;online.write(saved);}catch{}draft='';closeComposer();if(alive())await load();}catch(error){if(!dialog.isConnected&&alive())status.textContent=error.message;if(dialog.isConnected){message.textContent=error.message;if(['QUOTE_ALREADY_SUBMITTED','QUOTE_CHANGED','QUOTE_REVOKED','QUOTE_NOT_FOUND'].includes(error.code)){online.invalidateQuotes?.();closeComposer();if(alive()){await load();status.textContent=error.message;}}if(error.code==='NICKNAME_LOCKED'&&error.nickname){name.value=draftName=error.nickname;name.readOnly=true;}}}finally{sending=false;if(alive())composeButton.disabled=false;if(form.isConnected)update();}};
+  form.onsubmit=async e=>{e.preventDefault();if(submit.disabled||sending||count(input.value)<1||count(input.value)>25||!validName())return;sending=true;composeButton.disabled=true;update();message.textContent=editing?'正在儲存修改…':'正在送出金句…';try{const content=input.value.normalize('NFC').trim(),author={avatarId:chosenMood,avatarCharacter:chosenCharacter};if(editing){if(!await saveEdit(online,original.quoteId,content,{...author,revision:original.revision},confirmModification)){message.textContent='';return;}}else await online.createQuote(content,{...author,nickname:name.value.normalize('NFC').trim()});try{const saved=online.read();saved.quoteAvatarId=chosenMood;saved.quoteAvatarCharacter=chosenCharacter;online.write(saved);}catch{}draft='';closeComposer();if(alive())await load();}catch(error){if(!dialog.isConnected&&alive())status.textContent=error.message;if(dialog.isConnected){message.textContent=error.message;if(['QUOTE_ALREADY_SUBMITTED','QUOTE_CHANGED','QUOTE_REVOKED','QUOTE_NOT_FOUND'].includes(error.code)){online.invalidateQuotes?.();closeComposer();if(alive()){await load();status.textContent=error.message;}}if(error.code==='NICKNAME_LOCKED'&&error.nickname){name.value=draftName=error.nickname;name.readOnly=true;}}}finally{sending=false;if(alive())composeButton.disabled=false;if(form.isConnected)update();}};
   dialog.showModal();
  }
  composeButton.onclick=compose;
@@ -65,5 +75,5 @@ async function open({online,utility,esc,avatar=()=>'',defaultCharacter='xiaojiu'
  });
  await load();
 }
-root.TaiguQuotesUI={open,tabs,introduction,count,randomTab,quoteHTML,quoteTime};
+root.TaiguQuotesUI={open,tabs,introduction,count,randomTab,quoteHTML,quoteTime,saveEdit};
 })(globalThis);

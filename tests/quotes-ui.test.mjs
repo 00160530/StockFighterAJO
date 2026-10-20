@@ -60,3 +60,15 @@ test('only the authenticated player’s exact quote ID receives the own-row colo
 test('editing uses the existing identity and invalidates cached boards after success or a moderation conflict',async()=>{
  let revoked=false;const a=cachedClient({fetcher:async(url,options,snapshot)=>url.endsWith('/edit')?(revoked?Response.json({error:{code:'QUOTE_REVOKED',message:'你的金句已被管理員註銷。'}},{status:409}):Response.json({saved:true})):Response.json(snapshot())});a.identity('a');await a.client.quotes();await a.client.updateQuote('quote-123','新金句',{revision:1,avatarId:3,avatarCharacter:'xiaoxiaojiu'});await a.client.quotes('latest');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,2);const edit=a.calls.find(c=>c.url.endsWith('/edit'));assert.equal(edit.options.headers.Authorization,'Bearer '+'a'.repeat(64));assert.deepEqual(JSON.parse(edit.options.body),{text:'新金句',revision:1,avatarId:3,avatarCharacter:'xiaoxiaojiu'});revoked=true;await assert.rejects(a.client.updateQuote('quote-123','再改',{revision:2,avatarId:3,avatarCharacter:'xiaoxiaojiu'}),e=>e.code==='QUOTE_REVOKED');await a.client.quotes('popular');assert.equal(a.calls.filter(c=>c.url.endsWith('/quote-boards')).length,3);
 });
+
+test('cancelling the edit warning makes no request; confirmation sends the reset acknowledgement and preserves errors',async()=>{
+ const calls=[],author={revision:2,avatarId:3,avatarCharacter:'xiaojiu'},online={updateQuote:async(...args)=>calls.push(args)};let prompt='';
+ assert.equal(await c.TaiguQuotesUI.saveEdit(online,'quote-123','新金句',author,text=>{prompt=text;return false;}),false);assert.equal(calls.length,0);assert.ok(prompt.includes('按讚數會歸零'));assert.ok(prompt.includes('確定要修改'));
+ assert.equal(await c.TaiguQuotesUI.saveEdit(online,'quote-123','新金句',author,()=>true),true);assert.equal(calls.length,1);assert.deepEqual(JSON.parse(JSON.stringify(calls[0])),['quote-123','新金句',{...author,confirmResetLikes:true}]);assert.equal(author.confirmResetLikes,undefined);
+ await assert.rejects(c.TaiguQuotesUI.saveEdit({updateQuote:async()=>{throw Error('尚未儲存');}},'quote-123','新金句',author,()=>true),/尚未儲存/);
+});
+
+
+test('an asynchronous edit confirmation waits before any write and can still cancel safely',async()=>{
+ let resolve;const writes=[],online={updateQuote:async(...args)=>writes.push(args)};const pending=c.TaiguQuotesUI.saveEdit(online,'quote-123','草稿',{revision:1,avatarId:1,avatarCharacter:'xiaojiu'},()=>new Promise(r=>resolve=r));assert.equal(writes.length,0);resolve(false);assert.equal(await pending,false);assert.equal(writes.length,0);
+});

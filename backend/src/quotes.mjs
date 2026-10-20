@@ -39,7 +39,7 @@ export async function createQuote(request,env,body,now,ip){
  return {submitted:true,id:saved.id};
 }
 export async function updateQuote(request,env,id,body,now,ip){
- exactKeys(body,['text','revision','avatarId','avatarCharacter']);uuid(id);
+ exactKeys(body,['text','revision','avatarId','avatarCharacter','confirmResetLikes']);uuid(id);
  const content=text(body.text,1,25,'金句'),revision=integer(body.revision,1,2147483647,'金句版本'),who=await player(request,env);
  const avatarId=integer(body.avatarId,1,10,'心情頭像'),avatarCharacter=body.avatarCharacter;
  if(!['xiaojiu','xiaoxiaojiu'].includes(avatarCharacter))fail(400,'INVALID_AVATAR','角色頭像不正確。');
@@ -50,8 +50,10 @@ export async function updateQuote(request,env,id,body,now,ip){
  const same=r=>r.body===content&&r.avatar_id===avatarId&&r.avatar_character===avatarCharacter;
  if(same(old))return {saved:true,id,revision:old.revision};
  if(old.revision!==revision)fail(409,'QUOTE_CHANGED','你的金句已在其他視窗修改，請重新開啟後再試。');
- // The trigger saves the previous version only if this conditional update actually succeeds.
- const result=await q(env,'UPDATE sf_stock_quotes SET body=?,avatar_id=?,avatar_character=?,revision=revision+1,featured=0,featured_at=NULL,updated_at=? WHERE id=? AND player_id=? AND hidden=0 AND revision=?',content,avatarId,avatarCharacter,now,id,who,revision).run();
+ if(body.confirmResetLikes!==true)fail(409,'QUOTE_EDIT_CONFIRMATION_REQUIRED','修改金句後按讚數會歸零，請重新整理並確認後再修改。');
+ // Archive the old like count in the update trigger, then clear votes only when this update wins.
+ // SQLite changes() excludes trigger writes; D1 batch keeps these statements in one transaction.
+ const [result]=await env.DB.batch([q(env,'UPDATE sf_stock_quotes SET body=?,avatar_id=?,avatar_character=?,revision=revision+1,featured=0,featured_at=NULL,updated_at=? WHERE id=? AND player_id=? AND hidden=0 AND revision=?',content,avatarId,avatarCharacter,now,id,who,revision),q(env,'DELETE FROM sf_stock_quote_likes WHERE quote_id=? AND changes()=1',id)]);
  if(!result.meta.changes){const current=await read();if(current?.hidden)fail(409,'QUOTE_REVOKED','你的金句已被管理員註銷。');if(!current)fail(404,'QUOTE_NOT_FOUND','找不到你的金句。');if(same(current))return {saved:true,id,revision:current.revision};fail(409,'QUOTE_CHANGED','你的金句已在其他視窗修改，請重新開啟後再試。');}
  return {saved:true,id,revision:revision+1};
 }

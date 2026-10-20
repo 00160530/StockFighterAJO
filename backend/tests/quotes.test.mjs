@@ -170,23 +170,23 @@ test('deleting a revoked quote releases its slot, but never restores revoked lea
  assert.equal((await a.call('/admin/api/quotes/'+id+'/delete',{confirm:true},null,admin)).status,200);
  const self=(await a.call('/v1/quote-boards',null,p.playerToken)).data.self;assert.equal(self.submitted,false);assert.equal(self.eligible,false);assert.equal((await a.call('/v1/quotes',{text:'不符資格'},p.playerToken)).status,403);
 });
-test('editing archives prior text and avatar for administrators while boards retain only the current version and likes',async()=>{
+test('editing archives prior text and avatar for administrators while boards show the current version with likes reset',async()=>{
  const a=setup(),p=await a.who(),fan=await a.who();await a.complete(p,{name:'修改股友'});const admin=await a.admin(),id=(await a.call('/v1/quotes',{text:'舊金句',avatarId:2,avatarCharacter:'xiaojiu'},p.playerToken)).data.id;
  await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken);await a.call('/admin/api/quotes/'+id+'/feature',{featured:true},null,admin);
  const before=(await a.call('/v1/quote-boards',null,p.playerToken)).data.self;assert.equal(before.revision,1);assert.equal(before.avatarId,2);
- const edit={text:'新金句',revision:1,avatarId:7,avatarCharacter:'xiaoxiaojiu'},path='/v1/quotes/'+id+'/edit';
+ const edit={text:'新金句',revision:1,confirmResetLikes:true,avatarId:7,avatarCharacter:'xiaoxiaojiu'},path='/v1/quotes/'+id+'/edit';
  assert.equal((await a.call(path,edit,p.playerToken)).status,200);
- for(const route of ['/v1/quotes','/v1/quote-boards']){const d=(await a.call(route,null,p.playerToken)).data,rows=d.items||d.tabs.latest.items;assert.equal(rows.length,1);assert.equal(rows[0].body,'新金句');assert.equal(rows[0].id,id);assert.equal(rows[0].likes,1);assert.equal(rows[0].featured,0);assert.equal(d.self.revision,2);assert.equal(d.self.avatarCharacter,'xiaoxiaojiu');assert.equal(d.self.avatarId,7);assert.equal(d.self.nickname,'修改股友');}
+ for(const route of ['/v1/quotes','/v1/quote-boards']){const d=(await a.call(route,null,p.playerToken)).data,rows=d.items||d.tabs.latest.items;assert.equal(rows.length,1);assert.equal(rows[0].body,'新金句');assert.equal(rows[0].id,id);assert.equal(rows[0].likes,0);assert.equal(rows[0].featured,0);assert.equal(d.self.revision,2);assert.equal(d.self.avatarCharacter,'xiaoxiaojiu');assert.equal(d.self.avatarId,7);assert.equal(d.self.nickname,'修改股友');}
  const rows=(await a.call('/admin/api/quotes',null,null,admin)).data;assert.equal(rows.total,2);const old=rows.items.find(r=>r.status==='modified'),current=rows.items.find(r=>r.status==='active');assert.equal(old.body,'舊金句');assert.equal(old.avatar_id,2);assert.equal(old.featured,1);assert.equal(old.likes,1);assert.equal(old.quote_id,id);assert.equal(current.body,'新金句');assert.equal(current.revision,2);
  const read=async params=>(await a.call('/admin/api/quotes?'+new URLSearchParams(params),null,null,admin)).data;
  assert.equal((await read({status:'modified',q:'舊',nickname:'修改',featured:'yes',sort:'updated'})).total,1);assert.equal((await read({status:'active'})).total,1);assert.equal((await read({status:'revoked'})).total,0);
- assert.equal((await a.call(path,edit,p.playerToken)).status,200);assert.equal((await read({status:'modified'})).total,1); // retry is a no-op
+ await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken);assert.equal((await a.call(path,edit,p.playerToken)).status,200);assert.equal((await read({status:'modified'})).total,1);assert.equal((await a.call('/v1/quotes')).data.items[0].likes,1); // retry never clears new votes
  assert.equal((await a.call(path,{...edit,text:'再修改',revision:2},p.playerToken)).status,200);assert.equal((await read({status:'modified'})).total,2);
  assert.equal((await a.call('/admin/api/quotes/'+id+'/delete',{confirm:true},null,admin)).status,200);assert.equal((await read({})).total,0);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,0);
 });
 
 test('quote edits reject other identities, invalid data, stale revisions and revoked quotes without creating history',async()=>{
- const a=setup(),p=await a.who(),other=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原文'},p.playerToken)).data.id,path='/v1/quotes/'+id+'/edit',edit={text:'修改',revision:1,avatarId:1,avatarCharacter:'xiaojiu'};
+ const a=setup(),p=await a.who(),other=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原文'},p.playerToken)).data.id,path='/v1/quotes/'+id+'/edit',edit={text:'修改',revision:1,confirmResetLikes:true,avatarId:1,avatarCharacter:'xiaojiu'};
  assert.equal((await a.call(path,edit)).status,401);assert.equal((await a.call(path,edit,other.playerToken)).status,404);assert.equal((await a.call(path,edit,p.playerToken,{source:'https://evil.test'})).status,403);
  for(const changes of [{text:'😀'.repeat(26)},{text:'換\n行'},{text:''},{revision:0},{revision:undefined},{avatarId:11},{avatarCharacter:'fake'},{nickname:'偽造'}])assert.equal((await a.call(path,{...edit,...changes},p.playerToken)).status,400);
  assert.equal((await a.call(path,{...edit,revision:2},p.playerToken)).data.error.code,'QUOTE_CHANGED');
@@ -195,7 +195,7 @@ test('quote edits reject other identities, invalid data, stale revisions and rev
 });
 
 test('simultaneous edits cannot overwrite each other and an admin revocation between read and write prevents replacement',async()=>{
- const a=setup(),p=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原文'},p.playerToken)).data.id,path='/v1/quotes/'+id+'/edit',edit={text:'修改甲',revision:1,avatarId:1,avatarCharacter:'xiaojiu'};
+ const a=setup(),p=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原文'},p.playerToken)).data.id,path='/v1/quotes/'+id+'/edit',edit={text:'修改甲',revision:1,confirmResetLikes:true,avatarId:1,avatarCharacter:'xiaojiu'};
  const results=await Promise.all([a.call(path,edit,p.playerToken),a.call(path,{...edit,text:'修改乙'},p.playerToken)]);assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,1);
  const prepare=a.DB.prepare;a.DB.prepare=sql=>{const statement=prepare(sql);if(!sql.startsWith('UPDATE sf_stock_quotes SET body='))return statement;const bind=statement.bind;statement.bind=(...args)=>{const bound=bind(...args),run=bound.run;bound.run=async()=>{a.DB.db.prepare('UPDATE sf_stock_quotes SET hidden=1 WHERE id=?').run(id);return run();};return bound;};return statement;};
  const r=await a.call(path,{...edit,text:'不能蓋過註銷',revision:2},p.playerToken);assert.equal(r.data.error.code,'QUOTE_REVOKED');assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,1);assert.notEqual(a.DB.db.prepare('SELECT body FROM sf_stock_quotes WHERE id=?').get(id).body,'不能蓋過註銷');
@@ -204,6 +204,22 @@ test('simultaneous edits cannot overwrite each other and an admin revocation bet
 test('a failed history insert rolls back the edit, and the additive migration preserves existing quotes and likes',async()=>{
  const a=setup(),p=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原文'},p.playerToken)).data.id;
  a.DB.db.exec("CREATE TRIGGER fail_quote_history BEFORE INSERT ON sf_stock_quote_revisions BEGIN SELECT RAISE(ABORT,'test failure'); END;");
- const r=await handle(new Request(base+'/v1/quotes/'+id+'/edit',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Authorization:'Bearer '+p.playerToken},body:JSON.stringify({text:'不能半套更新',revision:1,avatarId:1,avatarCharacter:'xiaojiu'})}),a.env);assert.equal(r.status,500);const saved=a.DB.db.prepare('SELECT body,revision FROM sf_stock_quotes').get();assert.equal(saved.body,'原文');assert.equal(saved.revision,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,0);
+ const r=await handle(new Request(base+'/v1/quotes/'+id+'/edit',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Authorization:'Bearer '+p.playerToken},body:JSON.stringify({text:'不能半套更新',revision:1,confirmResetLikes:true,avatarId:1,avatarCharacter:'xiaojiu'})}),a.env);assert.equal(r.status,500);const saved=a.DB.db.prepare('SELECT body,revision FROM sf_stock_quotes').get();assert.equal(saved.body,'原文');assert.equal(saved.revision,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,0);
  const DB=database({beforeMigration(db,name){if(!name.startsWith('0021'))return;db.prepare('INSERT INTO sf_players(id,token_hash,created_at) VALUES (?,?,?)').run('legacy','legacy',1);db.prepare('INSERT INTO sf_stock_quotes(id,player_id,body,hidden,featured,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run('legacy-quote','legacy','既有金句',1,0,2,3);db.prepare('INSERT INTO sf_stock_quote_likes VALUES (?,?,?)').run('legacy-quote','legacy',4);}});assert.equal(DB.db.prepare('SELECT body,revision,hidden FROM sf_stock_quotes').get().body,'既有金句');assert.equal(DB.db.prepare('SELECT revision FROM sf_stock_quotes').get().revision,1);assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes').get().n,1);assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,0);
+});
+
+test('quote edits require explicit reset confirmation, reset avatar-only edits and allow former fans to like the new version',async()=>{
+ const a=setup(),p=await a.who(),fan=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原金句'},p.playerToken)).data.id,path='/v1/quotes/'+id+'/edit',edit={text:'新金句',revision:1,avatarId:1,avatarCharacter:'xiaojiu'};
+ await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken);
+ for(const confirmResetLikes of [undefined,false,'true',1]){const r=await a.call(path,{...edit,confirmResetLikes},p.playerToken);assert.equal(r.data.error.code,'QUOTE_EDIT_CONFIRMATION_REQUIRED');assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions').get().n,0);assert.equal((await a.call('/v1/quotes')).data.items[0].body,'原金句');assert.equal((await a.call('/v1/quotes')).data.items[0].likes,1);}
+ assert.equal((await a.call(path,{...edit,confirmResetLikes:true},p.playerToken)).status,200);const after=(await a.call('/v1/quotes',null,fan.playerToken)).data.items[0];assert.equal(after.likes,0);assert.equal(after.liked,0);assert.equal(a.DB.db.prepare('SELECT likes FROM sf_stock_quote_revisions WHERE quote_id=? AND revision=1').get(id).likes,1);
+ assert.equal((await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken)).data.likes,1);
+ assert.equal((await a.call(path,{...edit,text:'過期修改',confirmResetLikes:true},p.playerToken)).data.error.code,'QUOTE_CHANGED');assert.equal((await a.call('/v1/quotes')).data.items[0].likes,1);
+ assert.equal((await a.call(path,{...edit,revision:2,avatarId:2,confirmResetLikes:true},p.playerToken)).status,200);assert.equal((await a.call('/v1/quotes')).data.items[0].likes,0);assert.equal(a.DB.db.prepare('SELECT likes FROM sf_stock_quote_revisions WHERE quote_id=? AND revision=2').get(id).likes,1);
+});
+
+test('a like reset failure rolls back the edited text, revision and history together with votes',async()=>{
+ const a=setup(),p=await a.who();await a.complete(p);const id=(await a.call('/v1/quotes',{text:'原金句'},p.playerToken)).data.id;await a.call('/v1/quotes/'+id+'/like',{liked:true},p.playerToken);
+ a.DB.db.exec("CREATE TRIGGER fail_quote_like_reset BEFORE DELETE ON sf_stock_quote_likes BEGIN SELECT RAISE(ABORT,'test reset failure'); END;");
+ const r=await handle(new Request(base+'/v1/quotes/'+id+'/edit',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Authorization:'Bearer '+p.playerToken},body:JSON.stringify({text:'不應儲存',revision:1,avatarId:1,avatarCharacter:'xiaojiu',confirmResetLikes:true})}),a.env);assert.equal(r.status,500);const saved=a.DB.db.prepare('SELECT body,revision FROM sf_stock_quotes WHERE id=?').get(id);assert.equal(saved.body,'原金句');assert.equal(saved.revision,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_likes WHERE quote_id=?').get(id).n,1);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_stock_quote_revisions WHERE quote_id=?').get(id).n,0);
 });
