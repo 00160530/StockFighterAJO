@@ -1,3 +1,5 @@
+import {boardSnapshot,category,scoreReceipt} from './boards.mjs';
+import {readProfile,saveProfile} from './profile.mjs';
 import {readAnnouncement,publishAnnouncement} from './announcements.mjs';
 import {readUpdates,saveUpdate,deleteUpdate} from './update-announcements.mjs';
 import {quoteList,quoteBoards,createQuote,updateQuote,likeQuote,quotesAdmin} from './quotes.mjs';
@@ -23,34 +25,8 @@ function bestInsert(env,runId,metric){const value=metric==='alpha'?'score':metri
  ON CONFLICT(player_id,edition,metric) DO UPDATE SET run_id=excluded.run_id,value=excluded.value,drawdown_bps=excluded.drawdown_bps,trades=excluded.trades,submitted_at=excluded.submitted_at
  WHERE excluded.value>sf_best_scores.value OR (excluded.value=sf_best_scores.value AND (excluded.drawdown_bps<sf_best_scores.drawdown_bps OR (excluded.drawdown_bps=sf_best_scores.drawdown_bps AND excluded.trades<sf_best_scores.trades)))`,metric,runId);}
 const order='b.value DESC,b.drawdown_bps ASC,b.trades ASC,b.submitted_at ASC,b.run_id ASC';
-function publicRow(row){return {startDate:row.start_date||EDITION.start,earlySettlementDate:row.early_settlement_date||null,dateJumps:JSON.parse(row.date_jumps||'[]'),avatarCharacter:row.avatar_character==='xiaoxiaojiu'?'xiaoxiaojiu':'xiaojiu',avatarId:row.avatar_id||1,financing:row.financing===1?'margin':'cash',margin:JSON.parse(row.margin_summary||'{}'),rank:row.rank,runId:row.id,nickname:row.nickname,outcome:row.outcome,mode:row.mode,score:row.score,equityCents:row.equity_cents,benchmarkCents:row.benchmark_cents,drawdownBps:row.drawdown_bps,trades:row.trades,gainCents:row.gain_cents,lossCents:row.loss_cents,highlights:JSON.parse(row.highlights),submittedAt:row.submitted_at};}
-// Legacy financing editions remain intact; both are ranked together from source runs.
-function boardOutcome(url){const v=url.searchParams.get('outcome')||(url.searchParams.get('metric')==='loss'?'lost':'won');if(!['won','lost'].includes(v))fail(400,'INVALID_OUTCOME','請選擇贏過大盤或未贏大盤。');if(url.searchParams.has('financing'))finance(url.searchParams.get('financing'));return v;}
-// One snapshot query ranks all four boards and includes the caller even below 100.
-async function boardSnapshot(env,playerId=null){
- const family=m=>supportedEditions.flatMap(id=>[editionFor(m,'cash',id),editionFor(m,'margin',id)]),life=family('life'),free=family('free'),slots=life.map(()=>'?').join(',');
- const tie="equity_cents DESC,CASE WHEN outcome='lost' THEN COALESCE(-loss_cents,0) ELSE COALESCE(gain_cents,0) END DESC,trades ASC,submitted_at ASC,id ASC";
- const rows=await all(stmt(env,`WITH candidates AS (
-  SELECT r.*,ROW_NUMBER() OVER(PARTITION BY mode,outcome,player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
-  WHERE hidden=0 AND outcome IN ('won','lost') AND
-   ((mode='life' AND edition IN (${slots})) OR (mode='free' AND edition IN (${slots})))
- ), ranked AS (
-  SELECT *,ROW_NUMBER() OVER(PARTITION BY mode,outcome ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1
- ) SELECT * FROM ranked WHERE rank<=100 OR player_id=? ORDER BY mode,outcome,rank`,...life,...free,playerId));
- const boards={life:{won:{items:[],entry:null},lost:{items:[],entry:null}},free:{won:{items:[],entry:null},lost:{items:[],entry:null}}};
- for(const row of rows){const b=boards[row.mode][row.outcome],item=publicRow(row);if(row.rank<=100)b.items.push(item);if(playerId&&row.player_id===playerId)b.entry=item;}
- return boards;
-}
-async function ranking(env,m,outcome='won',playerId=null){
- const editions=supportedEditions.flatMap(id=>[editionFor(m,'cash',id),editionFor(m,'margin',id)]),slots=editions.map(()=>'?').join(',');if(!['won','lost'].includes(outcome))fail(400,'INVALID_OUTCOME','排行榜分類不正確。');
- const tie='equity_cents DESC,'+(outcome==='lost'?'COALESCE(-loss_cents,0)':'COALESCE(gain_cents,0)')+' DESC,trades ASC,submitted_at ASC,id ASC';
- const rows=await all(stmt(env,`WITH candidates AS (
-  SELECT r.*,ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY ${tie}) AS player_best FROM sf_runs r
-  WHERE edition IN (${slots}) AND mode=? AND outcome=? AND hidden=0
- ), ranked AS (SELECT *,ROW_NUMBER() OVER(ORDER BY ${tie}) AS rank FROM candidates WHERE player_best=1)
- SELECT * FROM ranked ${playerId?'WHERE player_id=?':'ORDER BY rank LIMIT 100'}`,...editions,m,outcome,...(playerId?[playerId]:[])));
- return playerId?(rows[0]?publicRow(rows[0]):null):rows.map(publicRow);
-}
+async function ranking(env,m,board='won',playerId=null){const b=(await boardSnapshot(env,playerId))[m][category(board)];return playerId?b.entry:b.items;}
+function boardOutcome(url){if(url.searchParams.get('metric')==='loss')fail(400,'INVALID_BOARD','線上翻車榜已移除。');return category(url.searchParams.get('category')||url.searchParams.get('outcome')||'won');}
 function highlight(raw,sign){if(raw===null)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_HIGHLIGHT','交易高光不正確。');exactKeys(raw,['symbol','date','qty','priceCents','pnlCents','costBasisCents']);if(raw.costBasisCents!==undefined){integer(raw.costBasisCents,1,EDITION.maxEquityCents,'交易成本');const proceeds=raw.costBasisCents+raw.pnlCents;if(!Number.isSafeInteger(proceeds)||proceeds<0||proceeds>raw.priceCents*raw.qty)fail(400,'INVALID_HIGHLIGHT','交易成本與損益不一致。');}if(!EDITION.symbols.some(s=>s.id===raw.symbol)||typeof raw.date!=='string'||raw.date<EDITION.start||raw.date>EDITION.datasetEnd||!/^\d{4}-\d{2}-\d{2}$/.test(raw.date))fail(400,'INVALID_HIGHLIGHT','高光的標的或日期不正確。');integer(raw.qty,1,100000000*4,'高光股數');integer(raw.priceCents,1,100000000,'高光價格');integer(raw.pnlCents,-EDITION.maxEquityCents,EDITION.maxEquityCents,'高光損益');if(raw.pnlCents*sign<=0)fail(400,'INVALID_HIGHLIGHT','高光損益方向不正確。');return raw;}
 function marginSummary(raw){
  if(raw===undefined)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_MARGIN','融資紀錄不正確。');
@@ -68,7 +44,8 @@ function journey(body,session){
  const dateJumps=body.dateJumps??[];if(!Array.isArray(dateJumps)||dateJumps.length>5)fail(400,'INVALID_JOURNEY','日期跳躍紀錄不正確。');for(let i=0;i<dateJumps.length;i++){const j=dateJumps[i];if(!j||typeof j!=='object'||Array.isArray(j))fail(400,'INVALID_JOURNEY','日期跳躍格式不正確。');exactKeys(j,['from','to']);if(!START_BENCHMARKS[j.from]||!START_BENCHMARKS[j.to]||j.from<startDate||j.to<=j.from||j.to>body.date||i&&j.from<dateJumps[i-1].to)fail(400,'INVALID_JOURNEY','日期跳躍範圍不正確。');}return {startDate,earlySettlementDate,dateJumps,...meta};
 }
 export function validateScore(body,session,now){
- exactKeys(body,['sessionId','sessionToken','nickname','editionId','mode','outcome','date','sessions','score','equityCents','benchmarkCents','drawdownBps','trades','buyTrades','sellTrades','maxGain','maxLoss','margin','playTimeMs','playTimePartial','skillUses','avatarId','avatarCharacter','startDate','customStartDate','earlySettlementDate','dateJumps']);
+ exactKeys(body,['sessionId','sessionToken','cashCents','nickname','editionId','mode','outcome','date','sessions','score','equityCents','benchmarkCents','drawdownBps','trades','buyTrades','sellTrades','maxGain','maxLoss','margin','playTimeMs','playTimePartial','skillUses','avatarId','avatarCharacter','startDate','customStartDate','earlySettlementDate','dateJumps']);
+ if(body.outcome==='bankrupt')return validateBankruptScore(body,session,now);
  const dates=journey(body,session);
  if(!supportedEditions.includes(body.editionId)||session.mode!==body.mode||!(session.edition===editionFor(body.mode,'cash',body.editionId)||body.editionId===EDITION.id&&supportedEditions.some(id=>session.edition===editionFor(body.mode,'cash',id))))fail(400,'EDITION_MISMATCH','這輪的模式或行情版本不相容。');
  if(body.date!==EDITION.datasetEnd||body.sessions!==dates.sessions)fail(400,'INCOMPLETE_RUN','只有走到行情終點的完整輪次可以提交。');
@@ -81,33 +58,39 @@ export function validateScore(body,session,now){
  if(!trades&&equity>EDITION.initialCents)fail(400,'TRADE_MISMATCH','沒有成交的資產不能增加。');
  if(now-session.created_at<EDITION.minDurationSeconds[body.mode])fail(400,'TOO_FAST','這輪遊玩時長過短，請稍後再提交。',{retryAfter:EDITION.minDurationSeconds[body.mode]-(now-session.created_at)});
  if(body.avatarCharacter!==undefined&&!['xiaojiu','xiaoxiaojiu'].includes(body.avatarCharacter))fail(400,'INVALID_AVATAR','角色頭像不正確。');
- return {startDate:dates.startDate,earlySettlementDate:dates.earlySettlementDate,dateJumps:dates.dateJumps,avatarCharacter:body.avatarCharacter??'xiaojiu',avatarId:integer(body.avatarId??1,1,10,'心情頭像'),...privateStats(body,session,now),nickname:nickname(body.nickname),outcome,score,equityCents:equity,benchmarkCents:benchmark,drawdownBps:body.drawdownBps,trades,gainCents:maxGain?.pnlCents??null,lossCents:maxLoss?.pnlCents??null,highlights:{maxGain,maxLoss},financing:margin?1:0,marginSummary:margin||{}};
+ return {startDate:dates.startDate,earlySettlementDate:dates.earlySettlementDate,dateJumps:dates.dateJumps,avatarCharacter:body.avatarCharacter??'xiaojiu',avatarId:integer(body.avatarId??1,1,10,'心情頭像'),...privateStats(body,session,now),outcome,score,equityCents:equity,benchmarkCents:benchmark,drawdownBps:body.drawdownBps,trades,gainCents:maxGain?.pnlCents??null,lossCents:maxLoss?.pnlCents??null,highlights:{maxGain,maxLoss},financing:margin?1:0,marginSummary:margin||{}};
+}
+function validateBankruptScore(body,session,now){
+ const fields=['sessionId','sessionToken','editionId','mode','outcome','date','startDate','customStartDate','earlySettlementDate','dateJumps','sessions','equityCents','benchmarkCents','cashCents','playTimeMs','playTimePartial'];
+ const completion=Object.fromEntries(fields.filter(k=>body[k]!==undefined).map(k=>[k,body[k]]));validateCompletion(completion,session,now,validateScore,privateStats);
+ const trades=integer(body.trades,0,EDITION.maxTrades*(body.margin?2:1),'交易次數');integer(body.buyTrades,0,trades,'買進次數');integer(body.sellTrades,0,trades,'賣出次數');if(body.buyTrades+body.sellTrades!==trades)fail(400,'TRADE_MISMATCH','交易次數不一致。');
+ integer(body.drawdownBps,0,10000,'最大回撤');const maxGain=highlight(body.maxGain,1),maxLoss=highlight(body.maxLoss,-1),margin=marginSummary(body.margin);
+ if((maxGain||maxLoss)&&!body.sellTrades||margin&&(!body.buyTrades||(margin.interestPaidCents||margin.liquidations)&&!body.sellTrades))fail(400,'TRADE_MISMATCH','成交與融資紀錄不一致。');
+ if([maxGain,maxLoss].some(t=>t&&(t.date<(body.startDate||EDITION.start)||t.date>body.date)))fail(400,'INVALID_HIGHLIGHT','高光日期超出本輪範圍。');
+ const score=Math.round((body.equityCents-body.benchmarkCents)/10000);if(body.score!==score)fail(400,'SCORE_MISMATCH','分數與總資產不一致。');
+ return {outcome:'lost',score,equityCents:body.equityCents,benchmarkCents:body.benchmarkCents,drawdownBps:body.drawdownBps,trades,gainCents:maxGain?.pnlCents??null,lossCents:maxLoss?.pnlCents??null,highlights:{maxGain,maxLoss},financing:margin?1:0,marginSummary:margin||{},startDate:body.startDate||EDITION.start,earlySettlementDate:body.earlySettlementDate||null,dateJumps:body.dateJumps||[],...privateStats(body,session,now)};
 }
 async function submit(request,env,body,now,ip){
  const playerId=await player(request,env);await rate(env,'score-ip:'+ip,30,3600,now);await rate(env,'score-player:'+playerId,12,3600,now);
  uuid(body.sessionId);if(typeof body.sessionToken!=='string'||!/^[a-f0-9]{64}$/.test(body.sessionToken))fail(401,'SESSION_INVALID','這輪沒有有效的線上 Session。');
  const tokenHash=await hash(body.sessionToken),session=await stmt(env,'SELECT * FROM sf_sessions WHERE id=? AND player_id=? AND token_hash=?',body.sessionId,playerId,tokenHash).first();if(!session)fail(401,'SESSION_INVALID','這輪沒有有效的線上 Session。');
- if(session.used_at!==null){const prior=await stmt(env,'SELECT outcome,submitted_at FROM sf_runs WHERE session_id=?',session.id).first();fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:{rank:await ranking(env,session.mode,prior?.outcome||'won',playerId),submitted:true,submittedAt:prior?.submitted_at}});}
+ if(session.used_at!==null){const run=await stmt(env,'SELECT * FROM sf_runs WHERE session_id=?',session.id).first();fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:run?await scoreReceipt(env,run,playerId):null});}
  if(session.expires_at<=now)fail(410,'SESSION_EXPIRED','這輪的線上 Session 已到期，本機紀錄仍會保留。');
- const r=validateScore(body,session,now),id=crypto.randomUUID(),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();
- if(profile?.nickname&&profile.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:profile.nickname});
- const nameTaken=()=>fail(409,'NICKNAME_TAKEN','這個暱稱已有人使用，請換一個暱稱。');
- if(!profile?.nickname&&await stmt(env,'SELECT 1 FROM sf_players WHERE nickname IS NOT NULL AND lower(trim(nickname))=lower(trim(?)) AND id<>? LIMIT 1',r.nickname,playerId).first())nameTaken();
- let results;try{results=await env.DB.batch([
-  stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>? AND EXISTS (SELECT 1 FROM sf_players p WHERE p.id=sf_sessions.player_id AND (p.nickname IS NULL OR p.nickname=?))',now,id,session.id,playerId,tokenHash,now,r.nickname),
-  stmt(env,'UPDATE sf_players SET nickname=? WHERE id=? AND nickname IS NULL AND EXISTS (SELECT 1 FROM sf_sessions WHERE id=? AND submission_id=?)',r.nickname,playerId,session.id,id),
-  stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps)
-   SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),r.nickname,r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.avatarId,r.avatarCharacter,r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),session.id,id),
+ const r=validateScore(body,session,now);let profile=await readProfile(env,playerId);
+ // Transitional support for an already-open old client. Never persist identity on a run.
+ if(!profile.nickname&&body.nickname!==undefined)profile=await saveProfile(env,playerId,{nickname:body.nickname,...(body.avatarId!==undefined?{avatarId:body.avatarId}:{}),...(body.avatarCharacter!==undefined?{avatarCharacter:body.avatarCharacter}:{})},now);
+ if(!profile.nickname)fail(409,'NICKNAME_REQUIRED','請先設定玩家暱稱，再上傳這輪成績。');
+ if(body.nickname!==undefined&&nickname(body.nickname)!==profile.nickname)fail(409,'NICKNAME_LOCKED','暱稱設定後即固定，無法修改。',{nickname:profile.nickname});
+ const id=crypto.randomUUID(),results=await env.DB.batch([
+  stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>?',now,id,session.id,playerId,tokenHash,now),
+  stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,start_date,early_settlement_date,date_jumps,finish_status)
+   SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),body.outcome,session.id,id),
   stmt(env,"INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at,play_time_ms,play_time_partial) SELECT session_id,player_id,outcome,submitted_at,play_time_ms,CASE WHEN play_time_ms IS NULL THEN NULL ELSE play_time_partial END FROM sf_runs WHERE id=?",id),
-   ...METRICS.map(metric=>bestInsert(env,id,metric))
- ]);}catch(error){
-  // The database trigger closes the race after the precheck. D1 rolls back
-  // the whole batch, so a rejected nickname never consumes the game session.
-  if([error?.message,error?.cause?.message].some(message=>typeof message==='string'&&message.includes('SF_NICKNAME_TAKEN')))nameTaken();
-  throw error;
- }
- if(!results[2].meta.changes){const current=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',playerId).first();if(current?.nickname&&current.nickname!==r.nickname)fail(409,'NICKNAME_LOCKED','暱稱在第一次成功提交後即固定，無法修改。',{nickname:current.nickname});fail(409,'SESSION_USED','這輪已提交過成績。');}
- return {submitted:true,runId:id,submittedAt:now,nickname:r.nickname,rank:await ranking(env,session.mode,r.outcome,playerId),verification:'basic'};
+  ...METRICS.map(metric=>bestInsert(env,id,metric))
+ ]);
+ const run=await stmt(env,'SELECT * FROM sf_runs WHERE session_id=?',session.id).first();
+ if(!results[1].meta.changes)fail(409,'SESSION_USED','這輪已提交過成績。',{receipt:run?await scoreReceipt(env,run,playerId):null});
+ return scoreReceipt(env,run,playerId);
 }
 async function feedback(request,env,body,now,ip){
  exactKeys(body,['requestId','kind','title','body','steps','version','context','website']);const playerId=await player(request,env),requestId=uuid(body.requestId);
@@ -120,7 +103,7 @@ async function feedback(request,env,body,now,ip){
 }
 function originAllowed(request,env){const origin=request.headers.get('origin');return origin&&(env.ALLOWED_ORIGINS||'').split(',').includes(origin);}
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
-function adminResponse(content,type){return new Response(content,{headers:{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Referrer-Policy':'same-origin'}});}
+function adminResponse(content,type){return new Response(content,{headers:{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' https://00160530.github.io; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Referrer-Policy':'same-origin'}});}
 async function admin(request,env,url,body,now,assets){
  if(request.method==='GET'&&['/admin','/admin/'].includes(url.pathname))return adminResponse(assets.html,'text/html');
  if(request.method==='GET'&&url.pathname==='/admin/style.css')return adminResponse(assets.css,'text/css');
@@ -155,11 +138,11 @@ async function admin(request,env,url,body,now,assets){
   }
   if(request.method==='GET'&&url.pathname==='/admin/api/runs'){
    const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),q=text(url.searchParams.get('q')||'',0,80,'查詢文字'),id=text(url.searchParams.get('id')||'',0,80,'成績編號'),state=url.searchParams.get('status')||'all',m=url.searchParams.get('mode')||'all',f=url.searchParams.get('financing')||'all',sort=url.searchParams.get('sort')||'latest';
-   const sorts={latest:'submitted_at DESC,id DESC',score:'score DESC,submitted_at DESC,id DESC',equity:'equity_cents DESC,id DESC',duration:'play_time_ms DESC,id DESC',trades:'trades DESC,id DESC',gain:'gain_cents DESC,id DESC',loss:'loss_cents ASC NULLS LAST,id DESC'};
+   const sorts={financing_total:"COALESCE(CAST(json_extract(margin_summary,'$.totalBorrowedCents') AS INTEGER),0) DESC,submitted_at DESC,id DESC",latest:'submitted_at DESC,id DESC',score:'score DESC,submitted_at DESC,id DESC',equity:'equity_cents DESC,id DESC',duration:'play_time_ms DESC,id DESC',trades:'trades DESC,id DESC',gain:'gain_cents DESC,id DESC',loss:'loss_cents ASC NULLS LAST,id DESC'};
    if(!['all','active','revoked'].includes(state)||!['all','life','free'].includes(m)||!['all','cash','margin'].includes(f)||!Object.hasOwn(sorts,sort))fail(400,'INVALID_FILTER','查詢條件不正確。');
    const clauses=[],args=[];if(q){clauses.push("nickname LIKE ? ESCAPE '\\'");args.push('%'+q.replace(/[\\%_]/g,'\\$&')+'%');}if(id){clauses.push('id=?');args.push(id);}if(state!=='all'){clauses.push('hidden=?');args.push(state==='revoked'?1:0);}if(m!=='all'){clauses.push('mode=?');args.push(m);}if(f!=='all'){clauses.push('financing=?');args.push(f==='margin'?1:0);}const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
-   const rows=await all(stmt(env,'SELECT id,nickname,mode,outcome,score,equity_cents,benchmark_cents,gain_cents,loss_cents,highlights,drawdown_bps,trades,hidden,moderation_note,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps FROM sf_runs'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?',...args,page*50));
-   const count=await stmt(env,'SELECT COUNT(*) AS n FROM sf_runs'+where,...args).first();return json({items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n});
+   const rows=await all(stmt(env,'SELECT id,nickname,mode,outcome,score,equity_cents,benchmark_cents,gain_cents,loss_cents,highlights,drawdown_bps,trades,hidden,moderation_note,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps FROM (SELECT r.*,p.nickname,p.avatar_id,p.avatar_character FROM sf_runs r JOIN sf_players p ON p.id=r.player_id)'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?',...args,page*50));
+   const count=await stmt(env,'SELECT COUNT(*) AS n FROM (SELECT r.*,p.nickname,p.avatar_id,p.avatar_character FROM sf_runs r JOIN sf_players p ON p.id=r.player_id)'+where,...args).first();return json({items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n});
   }
   if(request.method==='POST'&&/^\/admin\/api\/runs\/[a-zA-Z0-9_-]+\/(hide|restore)$/.test(url.pathname)){
    exactKeys(body,['note']);const id=url.pathname.split('/').at(-2),hidden=url.pathname.endsWith('/hide')?1:0,note=text(body.note,2,500,hidden?'註銷原因':'恢復原因');const row=await stmt(env,'SELECT player_id,edition FROM sf_runs WHERE id=?',id).first();if(!row)fail(404,'NOT_FOUND','找不到這筆成績。');
@@ -176,7 +159,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.30'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.31'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -186,7 +169,7 @@ export async function handle(request,env,ctx={},assets={}){
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const [announcement,updates]=await Promise.all([readAnnouncement(env),readUpdates(env)]);return json({announcement,updates},200,cors);}
-  if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),profile=await stmt(env,'SELECT nickname FROM sf_players WHERE id=?',p).first();return json({nickname:profile?.nickname||null},200,cors);}
+  if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env);return json(await readProfile(env,p),200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/boards'){
    await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;
    return json({edition:EDITION.id,boards:await boardSnapshot(env,p),verification:'basic',generatedAt:now},200,cors);
@@ -195,11 +178,13 @@ export async function handle(request,env,ctx={},assets={}){
    await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({mode:m,outcome,edition:EDITION.id,items:await ranking(env,m,outcome),verification:'basic'},200,cors);
   }
   if(request.method==='GET'&&url.pathname==='/v1/rank'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({entry:await ranking(env,m,outcome,p)},200,cors);}
+  if(request.method==='GET'&&url.pathname==='/v1/score-receipt'){const p=await player(request,env);await rate(env,'read:'+ip,120,60,now);const runId=uuid(url.searchParams.get('runId')),run=await stmt(env,'SELECT r.* FROM sf_runs r JOIN sf_sessions s ON s.id=r.session_id WHERE s.run_id=? AND r.player_id=?',runId,p).first();if(!run)fail(404,'RUN_NOT_FOUND','這輪尚未上傳。');return json(await scoreReceipt(env,run,p),200,cors);}
   if(request.method!=='POST')fail(404,'NOT_FOUND','找不到這個 API。');if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');
   const body=await readJson(request);
   let response;
   if(url.pathname==='/v1/players'){
    exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at,last_seen_at) VALUES (?,?,?,?)',id,await hash(token),now,now).run();response={playerId:id,playerToken:token};
+  }else if(url.pathname==='/v1/profile'){response=await saveProfile(env,await player(request,env),body,now);
   }else if(url.pathname==='/v1/sessions'){
    exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(!supportedEditions.includes(body.editionId))fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId),requestedEdition=editionFor(m,'cash',body.editionId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);
    const token=await hmac(env.RATE_LIMIT_SECRET,'session:'+p+':'+run+':'+requestedEdition),id=crypto.randomUUID(),expiresAt=now+EDITION.sessionTtlSeconds;await stmt(env,'INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at,start_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_id,run_id,edition) DO NOTHING',id,p,run,await hash(token),m,requestedEdition,now,expiresAt,startDate).run();

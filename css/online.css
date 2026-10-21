@@ -13,3 +13,41 @@
 .board-table th:nth-child(2){text-align:left;padding-left:56px}.board-player+.board-start-date{text-align:left;margin-left:46px}
 
 .board-toolbar{display:flex;align-items:center;justify-content:flex-start;gap:12px;margin-bottom:12px}.board-toolbar .board-location{flex-shrink:0;margin-bottom:0}.board-nickname{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:3px 0;min-width:0;max-width:55%;margin:0;font-size:12px;line-height:1.6;color:#6b8172;overflow-wrap:anywhere}.board-nickname strong{font-weight:700;color:#3f6b50}@media(max-width:600px){.board-toolbar{flex-direction:column;align-items:stretch;gap:8px}.board-nickname{max-width:none;justify-content:flex-start}}
+.board-profile{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.board-row-own{background:#edf6f0}
+.board-table .board-row-own td{background:transparent}
+.board-extra-table{min-width:650px}
+.board-extra-table .board-player{justify-content:flex-start}
+.player-profile-dialog{max-width:760px;width:calc(100% - 32px);max-height:90dvh;overflow:auto}
+.player-profile-form{padding:22px;display:grid;gap:14px}
+.player-profile-form>label{display:grid;gap:8px}
+.player-profile-form input[name=nickname]{width:100%}
+.player-profile-form input[name=nickname]{padding:10px 12px;border:1px solid #c4d9ca;border-radius:6px;font:inherit;color:#345c40;background:white}
+.player-profile-form .dialog-actions{justify-content:flex-end}
+.player-profile-form .dialog-actions button,.profile-character-tabs button{padding:9px 14px;border:1px solid #c4d9ca;border-radius:7px}
+.player-profile-form .primary{background:#426f51;color:white}
+.board-profile .board-nickname{max-width:none}
+.board-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.profile-character-tabs{display:flex;gap:10px}
+.profile-character-tabs [aria-pressed=true]{background:var(--green,#3e6d52);color:white}
+.profile-moods .mood-avatar{width:58px;height:58px}
+.rank-award{display:flex;gap:16px;align-items:center;padding:18px;margin:12px 0;border:1px solid #bdd5c6;border-radius:12px;background:#edf6f0;animation:rank-award-in .4s ease-out}
+.rank-award>span{font-size:34px}.rank-award h3,.rank-award p{margin:4px 0}
+@keyframes rank-award-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.rank-award{animation:none}}
+@media(max-width:600px){.board-profile{align-items:flex-start;gap:8px}.player-profile-form{padding:16px}.profile-moods .mood-avatar{width:42px;height:42px}}
+
+.profile-avatar-button{display:flex;align-items:center;gap:9px;padding:7px 12px;text-align:left;border:1px solid #bed5c6;border-radius:9px;background:#fff;line-height:1.5;white-space:nowrap}
+.profile-avatar-button .mood-avatar{width:40px;height:40px}.profile-avatar-button b{display:block;font-size:12px;font-weight:600;color:#78907e}.profile-avatar-button>span:last-child{margin-left:4px}
+.profile-avatar-panel{padding:14px;border:1px solid #bed2c4;border-radius:12px;background:#fff;min-width:0}
+.profile-avatar-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 12px;margin-bottom:12px;color:#3d634c}.profile-avatar-heading strong{font-size:13px}.profile-avatar-heading small{font-size:12px;color:#78907e;line-height:1.5}
+.profile-character-tabs button{flex:1;background:#fff;color:#63816d}.profile-avatar-panel .mood-picker{margin:12px 0 0}.profile-avatar-panel .mood-picker legend{font-weight:400;color:#6d8775}.profile-avatar-panel .profile-moods{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.profile-avatar-panel .profile-moods label{flex-direction:column;gap:4px;padding:7px 2px;background:#fff}.profile-avatar-panel .profile-moods label:has(:checked){background:#e4f1e8;border-color:#4e7c5d;box-shadow:none}.profile-avatar-panel .profile-moods .mood-avatar{width:64px;height:64px}.profile-avatar-panel .profile-moods .profile-mood-name{font-size:13px;font-weight:600;color:#304b3d;line-height:1.5}
+.board-details-dialog{width:min(840px,94vw);max-height:90dvh;overflow:auto}.board-details-content{padding:20px 24px}.board-col-rank{width:48px}
+@media(max-width:600px){.profile-avatar-panel{padding:10px}.profile-avatar-panel .profile-moods{gap:5px}.profile-avatar-panel .profile-moods .mood-avatar{width:38px;height:38px}.profile-avatar-panel .profile-moods .profile-mood-name{font-size:12px}.board-details-content{padding:16px}}
+.board-col-player{width:auto}
+
+.player-profile-dialog:has(form.player-profile-form){overflow:hidden}.player-profile-dialog:has(form.player-profile-form)[open]{display:flex;flex-direction:column}.player-profile-dialog:has(form.player-profile-form)>.dialog-heading{flex:0 0 auto}
+form.player-profile-form{display:grid;grid-template-rows:minmax(0,1fr) auto;flex:1 1 auto;min-height:0;overflow:hidden;padding:0;gap:0}
+.player-profile-body{display:grid;gap:14px;min-height:0;overflow:auto;overscroll-behavior:contain;padding:22px}.player-profile-body>label{display:grid;gap:8px}
+.player-profile-footer{display:block;font:inherit;color:inherit;padding:16px 22px;border-top:1px solid #d5e4db;background:#fff}.player-profile-footer .dialog-actions{margin:0}.player-profile-footer .profile-status{margin:0 0 12px;font-size:13px;line-height:1.5}.player-profile-footer .profile-status:empty{display:none}
+@media(max-width:600px){.player-profile-body{padding:16px}.player-profile-footer{padding:12px 16px}}

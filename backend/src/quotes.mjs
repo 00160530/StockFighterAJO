@@ -2,7 +2,7 @@ import {exactKeys,fail,integer,text,uuid,player,rate,nickname} from './security.
 const q=(env,sql,...args)=>env.DB.prepare(sql).bind(...args);
 const all=async s=>(await s.all()).results;
 const likes='(SELECT COUNT(*) FROM sf_stock_quote_likes l WHERE l.quote_id=q.id)';
-const eligibleSQL="SELECT 1 FROM sf_runs WHERE player_id=? AND mode='life' AND outcome IN ('won','lost') AND hidden=0 LIMIT 1";
+const eligibleSQL="SELECT 1 FROM sf_runs WHERE player_id=? AND mode='life' AND outcome IN ('won','lost') AND COALESCE(finish_status,outcome)<>'bankrupt' AND hidden=0 LIMIT 1";
 const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 export async function quoteList(request,env,tab){
  const sorts={popular:'likes DESC,q.created_at DESC,q.revision DESC,q.id DESC',latest:'q.created_at DESC,q.revision DESC,q.id DESC',featured:'q.featured_at DESC,q.created_at DESC,q.revision DESC,q.id DESC'};

@@ -17,7 +17,7 @@ async function setup(DB=database()){
 function seedPlayer(DB,id,name=null,created=100,lastSeen=null){DB.db.prepare('INSERT INTO sf_players(id,token_hash,nickname,created_at,last_seen_at) VALUES (?,?,?,?,?)').run(id,'hash-'+id,name,created,lastSeen);}
 function seedUpload(DB,player,id,hidden=0){
  DB.db.prepare('INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)').run(id,player,id,'session-'+id,'life','test-edition',1,9999999999);
- DB.db.prepare('INSERT INTO sf_runs(id,session_id,player_id,edition,mode,nickname,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,highlights,submitted_at,hidden) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,id,player,'test-edition','life','上傳時名稱','lost',-1,1,2,0,0,'{}',200,hidden);
+ DB.db.prepare('INSERT INTO sf_runs(id,session_id,player_id,edition,mode,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,highlights,submitted_at,hidden) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,id,player,'test-edition','life','lost',-1,1,2,0,0,'{}',200,hidden);
 }
 test('admin lists every anonymous identity including unnamed zero-upload and banned players; all uploaded runs count once',async()=>{
  const a=await setup();for(let i=0;i<52;i++)seedPlayer(a.DB,'player-'+String(i).padStart(3,'0'),i===51?'有暱稱':null,100,i===51?200:null);
@@ -28,7 +28,7 @@ test('admin lists every anonymous identity including unnamed zero-upload and ban
  const first=(await a.call('/admin/api/players')).data,second=(await a.call('/admin/api/players?page=1')).data;
  assert.equal(first.total,52);assert.equal(first.items.length,50);assert.equal(first.hasMore,true);assert.equal(second.items.length,2);assert.equal(second.hasMore,false);
  const all=[...first.items,...second.items];assert.equal(new Set(all.map(x=>x.id)).size,52);assert.equal(first.items[0].upload_count,2);assert.equal(all.filter(x=>x.upload_count===0).length,51);assert.equal(all.filter(x=>x.nickname===null).length,51);assert.ok(all.some(x=>x.id==='player-050'));
- for(const row of all)assert.deepEqual(Object.keys(row).sort(),['created_at','free_completed_count','id','last_seen_at','life_completed_count','longest_play_time_ms','nickname','upload_count']);
+ for(const row of all)assert.deepEqual(Object.keys(row).sort(),['avatar_character','avatar_id','created_at','free_completed_count','id','last_seen_at','life_completed_count','longest_play_time_ms','nickname','upload_count']);
  assert.deepEqual((await a.call('/admin/api/players')).data,first);
 });
 test('player filters escape wildcard text, combine conditions, and sort by uploads, time or nickname',async()=>{
@@ -91,3 +91,10 @@ test('player sorting uses each mode completion count and the longest recorded si
  const rows=(await a.call('/admin/api/players?sort=duration')).data.items;assert.equal(rows[0].longest_play_time_ms,90000);assert.equal(rows[0].life_completed_count,1);assert.equal(rows[0].free_completed_count,1);assert.ok(rows.findIndex(r=>r.id==='zero')<rows.findIndex(r=>r.id==='unknown'));assert.equal(rows.at(-1).longest_play_time_ms,null);
  const id=crypto.randomUUID();seedPlayer(a.DB,id);completed(id,'life',123456);const activity=(await a.call('/admin/api/players/'+id+'/activity?kind=life')).data;assert.equal(activity.items[0].play_time_ms,123456);assert.equal(activity.items[0].play_time_partial,0);assert.equal((await a.call('/admin/api/players/'+id+'/activity?kind=life',null,{admin:false})).status,401);
 });
+
+ test('admin player avatars come from the profile even when no score has ever been uploaded',async()=>{
+ const a=await setup();seedPlayer(a.DB,'avatar-profile','頭像股友');seedPlayer(a.DB,'avatar-default');
+ a.DB.db.prepare('UPDATE sf_players SET avatar_id=4,avatar_character=? WHERE id=?').run('xiaoxiaojiu','avatar-profile');
+ const rows=(await a.call('/admin/api/players')).data.items,chosen=rows.find(r=>r.id==='avatar-profile'),fallback=rows.find(r=>r.id==='avatar-default');
+ assert.equal(chosen.avatar_id,4);assert.equal(chosen.avatar_character,'xiaoxiaojiu');assert.equal(chosen.upload_count,0);assert.equal(fallback.avatar_id,1);assert.equal(fallback.avatar_character,'xiaojiu');assert.equal(chosen.token_hash,undefined);
+ });
