@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {DatabaseSync} from 'node:sqlite';
 import {database} from './db.mjs';import {handle,EDITION} from '../src/api.mjs';
 function setup(){const DB=database(),origin='https://player.github.io',env={DB,ALLOWED_ORIGINS:origin,RATE_LIMIT_SECRET:'profile-tests'};
- const call=async(path,body,who)=>{DB.db.exec('DELETE FROM sf_rate_limits');const r=await handle(new Request('https://api.test'+path,{method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',...(who?{Authorization:'Bearer '+who.playerToken}:{})},...(body?{body:JSON.stringify(body)}:{})}),env);const data=await r.json();assert.notEqual(r.status,500,DB.errors.join('\n'));return {status:r.status,data};};
+ const call=async(path,body,who)=>{const r=await handle(new Request('https://api.test'+path,{method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',...(who?{Authorization:'Bearer '+who.playerToken}:{})},...(body?{body:JSON.stringify(body)}:{})}),env);const data=await r.json();assert.notEqual(r.status,500,DB.errors.join('\n'));return {status:r.status,data};};
  const player=async(name)=>{const who=(await call('/v1/players',{})).data;if(name)assert.equal((await call('/v1/profile',{nickname:name,avatarId:3,avatarCharacter:'xiaoxiaojiu'},who)).status,200);return who;};
  const start=async(who,mode='life')=>{const r=await call('/v1/sessions',{runId:crypto.randomUUID(),mode,editionId:EDITION.id,startDay:-1},who);DB.db.prepare('UPDATE sf_sessions SET created_at=created_at-180 WHERE id=?').run(r.data.sessionId);return r.data;};
  return {DB,call,player,start};

@@ -85,10 +85,10 @@ test('admin requires login and same-origin protection; revoke preserves quota, l
  const list=(await a.call('/admin/api/quotes',null,null,admin)).data.items;assert.equal(list[0].moderation_note,'不當留言');assert.equal(list[0].likes,1);assert.equal(list[0].featured,0);
  assert.equal((await a.call(path+'/restore',{note:'誤判恢復'},null,admin)).status,200);assert.equal((await a.call('/v1/quotes')).data.items[0].likes,1);assert.equal(a.DB.db.prepare("SELECT COUNT(*) n FROM sf_admin_audit WHERE action LIKE 'quote-%'").get().n,4);
 });
-test('quote creation and likes retain existing origin, ban and rate protections',async()=>{
+test('quote creation pauses rate limiting while origin and ban checks remain enforced',async()=>{
  const a=setup(),p=await a.who();await a.complete(p);assert.equal((await a.call('/v1/quotes',{text:'一句'},p.playerToken,{source:'https://evil.test'})).status,403);
  const id=(await a.call('/v1/quotes',{text:'一句'},p.playerToken)).data.id;for(let i=0;i<9;i++)await a.call('/v1/quotes',{text:'一句'},p.playerToken);
- assert.equal((await a.call('/v1/quotes',{text:'一句'},p.playerToken)).status,429);a.DB.db.prepare('UPDATE sf_players SET banned=1 WHERE id=?').run(p.playerId);assert.equal((await a.call('/v1/quotes')).data.items.length,0);assert.equal((await a.call('/v1/quotes',null,p.playerToken)).status,401);const fan=await a.who();assert.equal((await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken)).status,404);
+ assert.equal((await a.call('/v1/quotes',{text:'一句'},p.playerToken)).status,200);a.DB.db.prepare('UPDATE sf_players SET banned=1 WHERE id=?').run(p.playerId);assert.equal((await a.call('/v1/quotes')).data.items.length,0);assert.equal((await a.call('/v1/quotes',null,p.playerToken)).status,401);const fan=await a.who();assert.equal((await a.call('/v1/quotes/'+id+'/like',{liked:true},fan.playerToken)).status,404);
 });
 
 test('quote authors support both characters and ten moods, preserve immutable author fields and reuse a locked leaderboard name',async()=>{

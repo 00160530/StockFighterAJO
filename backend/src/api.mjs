@@ -159,7 +159,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.31'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.32'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -203,8 +203,7 @@ export async function handle(request,env,ctx={},assets={}){
    }else if(url.pathname==='/v1/scores')response=await submit(request,env,body,now,ip);
   else if(url.pathname==='/v1/feedback')response=await feedback(request,env,body,now,ip);
   else fail(404,'NOT_FOUND','找不到這個 API。');
-  // Bounded cleanup avoids accumulating expired rate buckets without cron jobs.
-  if(ctx.waitUntil&&Math.random()<.05)ctx.waitUntil(stmt(env,'DELETE FROM sf_rate_limits WHERE bucket IN (SELECT bucket FROM sf_rate_limits WHERE expires_at<? LIMIT 100)',now).run().catch(()=>{}));
+  // Phase 1: pause rate-bucket cleanup and preserve all existing rows.
   return json(response,200,cors);
  }catch(e){if(e instanceof ApiError)return json({error:{code:e.code,message:e.message,...e.extra}},e.status,{...cors,...(e.extra.retryAfter?{'Retry-After':String(e.extra.retryAfter)}:{})});return json({error:{code:'SERVICE_ERROR',message:'服務暫時無法使用，請稍後再試。'}},500,cors);}
 }

@@ -4,6 +4,12 @@
 
 玩家資料與自動上傳調整見 [PLAYER_PROFILE_BOARDS.md](../docs/PLAYER_PROFILE_BOARDS.md)。新增 Migration 0024、0025；sf_runs 不再保存暱稱或排行榜頭像，查詢改 JOIN sf_players。新榜單、重試與部署回復流程以該文件為準。以下含歷史版本設計說明。
 
+## v0.16.32：D1 限流暫停
+
+第一階段將 `rate()` 改為不執行操作，保留所有呼叫位置，並停止 `sf_rate_limits` 過期清理。既有資料表與資料保留，不執行 Migration；其他資料表的寫入及原有身分、Session、成績去重規則不變。
+
+目前暫停所有使用 `rate()` 的流量限制，包含公開讀取、玩家操作與後台登入；後台密碼、同源檢查仍有效。本次不加入替代限流，後續再導入 Cloudflare Workers 原生 Rate Limiting。
+
 ## 公告圖片及每天提醒
 
 公告管理可填寫選用的 `imageUrl`（HTTPS 圖床圖片網址或 Google 雲端單一圖片的分享連結），並切換 `repeatDaily`。圖片留空即為純文字公告；有圖片時可在遊戲公告與「更新及公告」中點圖放大。Google 雲端分享請選「知道連結的任何人」可檢視，且須使用圖片檔案，不能是資料夾或 Google 文件；分享連結的 `resourcekey` 會保留。外部圖片若受分享權限、圖床防盜連或流量限制，會顯示原始連結供玩家另開查看，文字公告仍可閱讀。
