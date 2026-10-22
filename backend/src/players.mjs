@@ -1,27 +1,31 @@
-import {fail,integer,text,uuid} from './security.mjs';
+import {fail,integer,text,uuid,nowSeconds} from './security.mjs';
 import {adminCount,readAdminOverview} from './admin-counts.mjs';
+import {validDeviceFilter} from './device.mjs';
+import {MAX_EXPORT_ROWS} from './admin-runs.mjs';
 
 // Called only after admin authentication. Never return player/session credentials.
 export async function listPlayers(env,params,options={}){
  const page=integer(Number(params.get('page')||0),0,10000,'頁數');
  const query=text(params.get('q')||'',0,80,'暱稱'),id=text(params.get('id')||'',0,120,'匿名玩家編號');
- const named=params.get('named')||'all',uploads=params.get('uploads')||'all',sort=params.get('sort')||'online';
+ const named=params.get('named')||'all',uploads=params.get('uploads')||'all',sort=params.get('sort')||'online',device=params.get('device')||'all',exporting=options.exporting===true,size=exporting?MAX_EXPORT_ROWS:50;
  const sorts={online:'p.last_seen_at DESC NULLS LAST,p.id DESC',newest:'p.created_at DESC,p.id DESC',oldest:'p.created_at,p.id',uploads:'upload_count DESC,p.created_at DESC,p.id DESC',life_completed:'life_completed_count DESC,p.created_at DESC,p.id DESC',free_completed:'free_completed_count DESC,p.created_at DESC,p.id DESC',duration:'longest_play_time_ms DESC NULLS LAST,p.created_at DESC,p.id DESC',nickname:'p.nickname COLLATE NOCASE ASC NULLS LAST,p.id'};
- if(!['all','yes','no'].includes(named)||!['all','yes','no'].includes(uploads)||!Object.hasOwn(sorts,sort))fail(400,'INVALID_FILTER','查詢條件不正確。');
+ if(!['all','yes','no'].includes(named)||!['all','yes','no'].includes(uploads)||!validDeviceFilter(device)||!Object.hasOwn(sorts,sort))fail(400,'INVALID_FILTER','查詢條件不正確。');
  const clauses=[],args=[],like=value=>'%'+value.replace(/[\\%_]/g,'\\$&')+'%';
  if(query){clauses.push("p.nickname LIKE ? ESCAPE '\\'");args.push(like(query));}
  if(id){clauses.push("p.id LIKE ? ESCAPE '\\'");args.push(like(id));}
  if(named!=='all')clauses.push(named==='yes'?"p.nickname IS NOT NULL AND p.nickname<>''":"(p.nickname IS NULL OR p.nickname='')");
  if(uploads!=='all')clauses.push((uploads==='no'?'NOT ':'')+'EXISTS (SELECT 1 FROM sf_runs r WHERE r.player_id=p.id)');
+ if(device!=='all'){clauses.push('p.last_device_type=?');args.push(device);}
  const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
- const fields='p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at';
+ const fields='p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at,p.last_device_type';
  const stats={upload_count:'(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id)',life_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='life')",free_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='free')",longest_play_time_ms:'(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id)'};
  const metric={uploads:'upload_count',life_completed:'life_completed_count',free_completed:'free_completed_count',duration:'longest_play_time_ms'}[sort],defer=!!metric;
  // Preserve indexed simple sorts. Other sorts calculate only their ordering value before LIMIT.
- const pageSql='SELECT '+fields+(metric?','+stats[metric]+' AS '+metric:'')+' FROM sf_players p'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?';
- const sql=(defer?'WITH page AS MATERIALIZED ('+pageSql+') ':'')+'SELECT '+fields+','+Object.entries(stats).map(([key,value])=>(defer&&metric===key?'p.'+key:value)+' AS '+key).join(',')+' FROM '+(defer?'page':'sf_players')+' p'+(defer?'':where)+' ORDER BY '+sorts[sort]+(defer?'':' LIMIT 51 OFFSET ?');
- const rows=(await env.DB.prepare(sql).bind(...args,page*50).all()).results;
- const count=!clauses.length&&options.request?{n:(await readAdminOverview(env,options)).players}:await adminCount(env,'players-total:'+JSON.stringify([query,id,named,uploads]),()=>env.DB.prepare('SELECT COUNT(*) AS n FROM sf_players p'+where).bind(...args).first(),options);
+ const limit=' LIMIT '+(size+1)+' OFFSET ?',pageSql='SELECT '+fields+(metric?','+stats[metric]+' AS '+metric:'')+' FROM sf_players p'+where+' ORDER BY '+sorts[sort]+limit;
+ const sql=(defer?'WITH page AS MATERIALIZED ('+pageSql+') ':'')+'SELECT '+fields+','+Object.entries(stats).map(([key,value])=>(defer&&metric===key?'p.'+key:value)+' AS '+key).join(',')+' FROM '+(defer?'page':'sf_players')+' p'+(defer?'':where)+' ORDER BY '+sorts[sort]+(defer?'':limit);
+ const rows=(await env.DB.prepare(sql).bind(...args,exporting?0:page*size).all()).results;
+ if(exporting){if(rows.length>MAX_EXPORT_ROWS)fail(413,'EXPORT_TOO_LARGE','一次最多匯出 10,000 筆，請縮小篩選條件後再試。');return {items:rows,total:rows.length,exportedAt:nowSeconds()};}
+ const count=!clauses.length&&options.request?{n:(await readAdminOverview(env,options)).players}:await adminCount(env,'players-total:'+JSON.stringify([query,id,named,uploads,device]),()=>env.DB.prepare('SELECT COUNT(*) AS n FROM sf_players p'+where).bind(...args).first(),options);
  return {items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n};
 }
 

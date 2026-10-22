@@ -17,8 +17,19 @@ const freeSteps=[
  {id:'free-advance',target:'.advance-panel',title:'自己決定走一天，還是一段行情',text:'用主按鈕前往下一交易日，也可一次推進 5 日或 20 日。途中遇到事件會自動停下，完成選項後再繼續；這裡不會替你關閉任何操作期。'},
  {id:'free-menu',target:'#gameMenu nav',title:'自由模式，成績與教學各自保留',text:'回到起始畫面開啟排行榜，切到「自由模式」，就能看自由模式的獨立成績。從這裡「重看操作教學」會顯示這份差異教學；回人生模式則會顯示人生模式的完整教學。'}
 ];
-function stepsFor(mode){if(mode==='life')return lifeSteps;if(mode==='free')return freeSteps;throw Error('未知教學模式');}
-function profile(raw){return {version:VERSION,life:raw?.version===VERSION&&raw.life===true,free:raw?.version===VERSION&&raw.free===true};}
+const homeSteps=[
+ {id:'home-welcome',target:'#titleHeading',title:'恭喜完成人生模式！',text:'真正的冒險，現在才正式開始。已開放遊戲全部功能，一起看看起始畫面還能做什麼吧！'},
+ {id:'home-character',target:'#titleCharacter',title:'換個角色，重新出發',text:'點選這裡的角色，就能切換男主角小韭與女主角小小韭，選擇陪你展開下一輪冒險的主角。'},
+ {id:'home-modes',target:'#menuStart',title:'下一輪，換你挑戰最高獲利',text:'點「新遊戲」選擇自由模式，每個交易日都能買賣，挑戰更高獲利；也可以再玩一次人生模式，試試不同選擇、刷新自己的紀錄。'},
+ {id:'home-skills',target:'#menuSkills',title:'把通關獎勵變成下一輪的力量',text:'完成人生模式獲得的技能點，可以在這裡升級或解鎖技能，再到遊戲中使用。下一次重來，多一點準備！'},
+ {id:'home-rankings',target:'#menuRankings',title:'誰才是真正的股神？',text:'排行榜可查看其他股友的成績，人生模式與自由模式分開排名。以登榜為目標，努力寫下你的代表作吧！'},
+ {id:'home-records',target:'.title-records',title:'每一次冒險，都值得回顧',text:'「歷史遊玩數據」能回顧每輪表現、匯出對帳單；也能分享遊玩數據連結，向朋友炫耀你的投資戰績。'},
+ {id:'home-community',target:'.home-community',title:'和股友一起聊聊、一起投票',text:'「股友金句」可以留言、按讚，留下你的投資心得；「田野調查」可以投票，看看大家怎麼想，和股友互動。'},
+ {id:'home-more',target:'.community-links',title:'還有更多內容，等你發現',text:'想了解更多玩法，可以看「遊戲說明」；遇到問題或有建議，歡迎使用「許願池及問題回報」。也記得點開「關於」，裡面藏著小彩蛋喔！'}
+];
+function stepsFor(mode){if(mode==='life')return lifeSteps;if(mode==='free')return freeSteps;if(mode==='home')return homeSteps;throw Error('未知教學模式');}
+function profile(raw){return {version:VERSION,life:raw?.version===VERSION&&raw.life===true,free:raw?.version===VERSION&&raw.free===true,home:raw?.version===VERSION&&raw.home===true};}
+function needsHome(progression,raw){return progression?.freeUnlocked===true&&!profile(raw).home;}
 function needs(s,p){return ['life','free'].includes(s.mode)&&s.status==='playing'&&!s.opening&&!profile(p)[s.mode]&&(s.day<0||s.tutorialPending===true);}
 function complete(raw,mode){stepsFor(mode);return {...profile(raw),[mode]:true};}
 const clamp=(n,lo,hi)=>Math.max(lo,Math.min(n,Math.max(lo,hi)));
@@ -43,10 +54,10 @@ class Tour{
  move(direction){if(!this.active)return;if(direction<0){if(this.index>0){this.index--;this.showStep();}}else if(this.index<this.steps.length-1){this.index++;this.showStep();}else this.end(true);}
  showStep(){
   const s=this.steps[this.index];this.onStep?.(s);this.target=document.querySelector(s.target);if(!this.target)throw Error('教學區塊未找到：'+s.id);
-  this.dialog.dataset.step=s.id;this.dialog.dataset.mode=this.mode;this.dialog.querySelector('#tutorialLabel').textContent=this.mode==='life'?'人生模式・操作教學':'自由模式・差異教學';this.dialog.querySelector('#tutorialTitle').textContent=s.title;this.dialog.querySelector('#tutorialText').textContent=s.text;this.dialog.querySelector('#tutorialCount').textContent=(this.index+1)+' / '+this.steps.length;
+  this.dialog.dataset.step=s.id;this.dialog.dataset.mode=this.mode;this.dialog.querySelector('#tutorialLabel').textContent=this.mode==='home'?'新的冒險・起始頁教學':this.mode==='life'?'人生模式・操作教學':'自由模式・差異教學';this.dialog.querySelector('#tutorialTitle').textContent=s.title;this.dialog.querySelector('#tutorialText').textContent=s.text;this.dialog.querySelector('#tutorialCount').textContent=(this.index+1)+' / '+this.steps.length;
   this.dialog.querySelector('#tutorialFill').style.width=(this.index+1)/this.steps.length*100+'%';this.dialog.querySelector('#tutorialHint').textContent=this.required?'完成所有步驟後開始遊戲':'';this.dialog.querySelector('#tutorialHint').hidden=!this.required;
-  this.prev.disabled=this.index===0;this.next.textContent=this.index===this.steps.length-1?(this.required?'完成教學，開始遊戲 →':'完成教學 ✓'):'下一步 →';
-  const r=this.target.getBoundingClientRect();if(r.top<8||r.bottom>root.innerHeight-8)this.target.scrollIntoView({block:'start',inline:'nearest',behavior:'instant'});
+  this.prev.disabled=this.index===0;this.next.textContent=this.index===this.steps.length-1?(this.mode==='home'?'開始新的冒險 →':this.required?'完成教學，開始遊戲 →':'完成教學 ✓'):'下一步 →';
+  const r=this.target.getBoundingClientRect();if(this.mode==='home'||r.top<8||r.bottom>root.innerHeight-8)this.target.scrollIntoView({block:this.mode==='home'?'center':'start',inline:'nearest',behavior:'instant'});
   this.position();this.next.focus({preventScroll:true});
  }
  position(){
@@ -61,5 +72,5 @@ class Tour{
   if(!this.active||(!finished&&this.required))return;this.active=false;cancelAnimationFrame(this.frame);this.dialog.close();this.onStep?.(null);root.scrollTo({left:this.oldScroll[0],top:this.oldScroll[1],behavior:'instant'});if(this.oldFocus?.isConnected)this.oldFocus.focus({preventScroll:true});this.onEnd?.(finished,this.required);
  }
 }
-root.TaiguTutorial={VERSION,stepsFor,profile,needs,complete,placeCard,Tour};
+root.TaiguTutorial={VERSION,stepsFor,profile,needs,needsHome,complete,placeCard,Tour};
 })(globalThis);

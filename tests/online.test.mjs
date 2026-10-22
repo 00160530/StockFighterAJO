@@ -5,6 +5,11 @@ import vm from 'node:vm';
 const c={window:{},setTimeout,clearTimeout,AbortController};vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../js/online.js',import.meta.url),'utf8'),c);const {Client,payload,KEY}=c.window.TaiguOnline,config={apiBase:'https://api.example.test',editionId:'edition-current'};
 const plain=x=>JSON.parse(JSON.stringify(x));
 
+test('device hints handle iPad desktop mode and phones without using viewport width, and accompany API requests',async()=>{
+ const classify=c.window.TaiguOnline.deviceType;for(const [nav,type] of [[{userAgent:'Mozilla Macintosh',maxTouchPoints:5},'tablet'],[{userAgent:'Mozilla Macintosh',maxTouchPoints:0},'desktop'],[{userAgent:'Mozilla iPhone Mobile'},'mobile'],[{userAgent:'Mozilla Android 14 Mobile'},'mobile'],[{userAgent:'Mozilla Android 14'},'tablet'],[{userAgent:'Mozilla Windows NT 10.0'},'desktop'],[{},'unknown']])assert.equal(classify(nav),type);
+ const calls=[],client=new Client({config,storage:storage(),fetcher:async(url,options)=>{calls.push(options);return Response.json({ok:true});}});await client.request('/v1/players',{});assert.equal(calls[0].headers['X-SF-Device'],'unknown');await client.request('/health');assert.equal(calls[1].headers['X-SF-Device'],undefined);
+});
+
 test('displayed board requests only its own mode/category and caches scopes independently across tab switches',async()=>{
  let now=1000;const calls=[],store=storage(),client=new Client({config,storage:store,now:()=>now,fetcher:async url=>{calls.push(url);const value=snapshot(),u=new URL(url);value.scope=u.search;return Response.json(value);}});
  const one=await client.boards('life','won');await Promise.all([client.boards('free','gain'),client.boards('free','gain')]);assert.equal(calls.length,2);assert.equal(calls[0],config.apiBase+'/v1/boards?mode=life&category=won');assert.equal(calls[1],config.apiBase+'/v1/boards?mode=free&category=gain');assert.equal((await client.boards('life','won')).scope,one.scope);assert.equal(calls.length,2);

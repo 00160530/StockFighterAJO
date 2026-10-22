@@ -28,7 +28,7 @@ test('admin lists every anonymous identity including unnamed zero-upload and ban
  const first=(await a.call('/admin/api/players')).data,second=(await a.call('/admin/api/players?page=1')).data;
  assert.equal(first.total,52);assert.equal(first.items.length,50);assert.equal(first.hasMore,true);assert.equal(second.items.length,2);assert.equal(second.hasMore,false);
  const all=[...first.items,...second.items];assert.equal(new Set(all.map(x=>x.id)).size,52);assert.equal(first.items[0].upload_count,2);assert.equal(all.filter(x=>x.upload_count===0).length,51);assert.equal(all.filter(x=>x.nickname===null).length,51);assert.ok(all.some(x=>x.id==='player-050'));
- for(const row of all)assert.deepEqual(Object.keys(row).sort(),['avatar_character','avatar_id','created_at','free_completed_count','id','last_seen_at','life_completed_count','longest_play_time_ms','nickname','upload_count']);
+ for(const row of all)assert.deepEqual(Object.keys(row).sort(),['avatar_character','avatar_id','created_at','free_completed_count','id','last_device_type','last_seen_at','life_completed_count','longest_play_time_ms','nickname','upload_count']);
  assert.deepEqual((await a.call('/admin/api/players')).data,first);
 });
 test('player filters escape wildcard text, combine conditions, and sort by uploads, time or nickname',async()=>{

@@ -1,5 +1,7 @@
 (function(root){
 'use strict';
+function deviceType(nav=root.navigator){const ua=nav?.userAgent||'';if(/iPad|Tablet|PlayBook|Silk|Kindle|Android(?!.*Mobile)/i.test(ua)||/Macintosh/i.test(ua)&&Number(nav?.maxTouchPoints)>1)return 'tablet';if(/iPhone|iPod|Android.*Mobile|Windows Phone|Mobi/i.test(ua)||nav?.userAgentData?.mobile===true)return 'mobile';if(/Windows NT|Macintosh|Mac OS X|X11|CrOS|Linux/i.test(ua))return 'desktop';return 'unknown';}
+
 const KEY='taigu-warrior.v1.online';
 const BOARD_CACHE_MS=5*60*1000;
 function completionPayload(r,session,config){const cents=n=>Math.round(n*100);if(r.status!=='bankrupt')return {...payload(r,session,config),cashCents:cents(r.cash)};return {sessionId:session.sessionId,sessionToken:session.sessionToken,editionId:config.editionId,mode:r.mode,outcome:r.status,playTimeMs:r.playTimeMs??null,playTimePartial:r.playTimePartial===true,date:r.date,startDate:r.startDate,customStartDate:r.customStartDate??null,earlySettlementDate:r.earlySettlementDate??null,dateJumps:r.dateJumps??[],sessions:r.sessions,equityCents:cents(r.equity),benchmarkCents:cents(r.benchmark),cashCents:r.cash<0?Math.min(-1,cents(r.cash)):cents(r.cash)};}
@@ -10,7 +12,7 @@ class Client{
  get enabled(){const base=this.config?.apiBase||'',local=['127.0.0.1','localhost','[::1]'].includes(root.location?.hostname);return /^https:\/\//.test(base)||(local&&/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?(?:\/|$)/.test(base));}
  read(){try{const a=JSON.parse(this.storage.getItem(KEY)||'null');return a&&a.version===1&&a.sessions&&a.receipts?a:{version:1,sessions:{},receipts:{},player:null};}catch{return {version:1,sessions:{},receipts:{},player:null};}}
  write(a){try{this.storage.setItem(KEY,JSON.stringify(a));}catch{throw new CloudError('瀏覽器無法保留匿名身分，這輪仍可繼續本機遊玩。','STORAGE_UNAVAILABLE');}}
- async request(path,body,token){if(!this.enabled)throw new CloudError('線上服務尚未設定。','NOT_CONFIGURED');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{const response=await this.fetcher(this.config.apiBase+path,{method:body?'POST':'GET',headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:controller.signal,credentials:'omit'});let data;try{data=await response.json();}catch{throw new CloudError('服務回應異常，請稍後再試。');}if(!response.ok)throw new CloudError(data.error?.message||'線上服務暫時無法使用。',data.error?.code||'SERVICE_ERROR',data.error||{});return data;}catch(e){if(e instanceof CloudError)throw e;throw new CloudError('目前連不上線上服務，本機遊戲仍可繼續。');}finally{clearTimeout(timer);}}
+ async request(path,body,token){if(!this.enabled)throw new CloudError('線上服務尚未設定。','NOT_CONFIGURED');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{const response=await this.fetcher(this.config.apiBase+path,{method:body?'POST':'GET',headers:{...((token||path==='/v1/players')?{'X-SF-Device':deviceType()}:{}),...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:controller.signal,credentials:'omit'});let data;try{data=await response.json();}catch{throw new CloudError('服務回應異常，請稍後再試。');}if(!response.ok)throw new CloudError(data.error?.message||'線上服務暫時無法使用。',data.error?.code||'SERVICE_ERROR',data.error||{});return data;}catch(e){if(e instanceof CloudError)throw e;throw new CloudError('目前連不上線上服務，本機遊戲仍可繼續。');}finally{clearTimeout(timer);}}
  async identity(){const saved=this.read().player;if(saved?.playerToken)return saved;if(this.registering)return this.registering;this.registering=(async()=>{const data=await this.request('/v1/players',{}),a=this.read();a.player={playerId:data.playerId,playerToken:data.playerToken};this.write(a);return a.player;})().finally(()=>this.registering=null);return this.registering;}
  applyProfile(profile,token){
   const avatarId=profile.avatarId??1,avatarCharacter=profile.avatarCharacter??'xiaojiu';
@@ -115,5 +117,5 @@ class Client{
   async announcement(){return this.request('/v1/announcement');}
  async feedback(body){const p=await this.identity();return this.request('/v1/feedback',body,p.playerToken);}
 }
-root.TaiguOnline={KEY,BOARD_CACHE_MS,CloudError,Client,payload};
+root.TaiguOnline={deviceType,KEY,BOARD_CACHE_MS,CloudError,Client,payload};
 })(typeof window!=='undefined'?window:globalThis);

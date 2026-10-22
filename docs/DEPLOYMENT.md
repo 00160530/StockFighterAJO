@@ -76,6 +76,8 @@ pnpm exec wrangler d1 migrations apply DB --config wrangler.local.jsonc --remote
 
 僅測本機 SQLite 時，用 `--local` 取代 `--remote`。兩者是不同資料庫，本機 migration 不會建立遠端資料表。
 
+v0.16.33 新增 `0026_device_types.sql`。既有正式站應先備份 D1，套用這個新增欄位的 Migration，再部署 Worker，最後發布前端。舊資料的裝置為未知，無須回填；回復舊 Worker 時保留新增欄位即可，原有玩家與成績不刪除。欄位、裝置分類及匯出上限見 [裝置與後台匯出](DEVICE_AND_ADMIN_EXPORT.md)。
+
 ## 5. 建立自己的 Worker 與 Secret
 
 設定及資料表完成後，部署**自己的新環境**：

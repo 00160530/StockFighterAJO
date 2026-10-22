@@ -9,6 +9,8 @@ import {quoteList,quoteBoards,createQuote,updateQuote,likeQuote,quotesAdmin} fro
 import {START_BENCHMARKS} from './start-benchmarks.mjs';
 import {communityAdmin,publicPolls,lifeCounts,vote} from './community.mjs';
 import {validateCompletion} from './completions.mjs';
+import {requestDevice} from './device.mjs';
+import {listRuns} from './admin-runs.mjs';
 import {listPlayers,playerActivity} from './players.mjs';
 import {validateSharedRecord} from './shares.mjs';
 import {EDITION} from './edition.mjs';
@@ -86,8 +88,8 @@ async function submit(request,env,body,now,ip){
  if(body.nickname!==undefined&&nickname(body.nickname)!==profile.nickname)fail(409,'NICKNAME_LOCKED','暱稱設定後即固定，無法修改。',{nickname:profile.nickname});
  const id=crypto.randomUUID(),results=await env.DB.batch([
   stmt(env,'UPDATE sf_sessions SET used_at=?,submission_id=? WHERE id=? AND player_id=? AND token_hash=? AND used_at IS NULL AND expires_at>?',now,id,session.id,playerId,tokenHash,now),
-  stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,start_date,early_settlement_date,date_jumps,finish_status)
-   SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),body.outcome,session.id,id),
+  stmt(env,`INSERT INTO sf_runs(id,session_id,player_id,edition,mode,device_type,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,loss_cents,highlights,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,start_date,early_settlement_date,date_jumps,finish_status)
+   SELECT ?,id,player_id,?,mode,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM sf_sessions WHERE id=? AND submission_id=?`,id,editionFor(body.mode,r.financing?'margin':'cash',body.editionId),requestDevice(request),r.outcome,r.score,r.equityCents,r.benchmarkCents,r.drawdownBps,r.trades,r.gainCents,r.lossCents,JSON.stringify(r.highlights),now,r.financing,JSON.stringify(r.marginSummary),r.playTimeMs,r.playTimePartial,r.skillUses===null?null:JSON.stringify(r.skillUses),r.startDate,r.earlySettlementDate,JSON.stringify(r.dateJumps),body.outcome,session.id,id),
   stmt(env,"INSERT OR IGNORE INTO sf_life_completions(session_id,player_id,outcome,created_at,play_time_ms,play_time_partial) SELECT session_id,player_id,outcome,submitted_at,play_time_ms,CASE WHEN play_time_ms IS NULL THEN NULL ELSE play_time_partial END FROM sf_runs WHERE id=?",id),
   ...METRICS.map(metric=>bestInsert(env,id,metric))
  ]);
@@ -111,10 +113,12 @@ async function admin(request,env,url,body,now,assets){
  if(request.method==='GET'&&['/admin','/admin/'].includes(url.pathname))return adminResponse(assets.html,'text/html');
  if(request.method==='GET'&&url.pathname==='/admin/style.css')return adminResponse(assets.css,'text/css');
  if(request.method==='GET'&&url.pathname==='/admin/app.js')return adminResponse(assets.js,'text/javascript');
+ if(request.method==='GET'&&url.pathname==='/admin/export.js')return adminResponse(assets.exportJs,'text/javascript');
+ if(request.method==='GET'&&url.pathname==='/admin/exceljs.js')return adminResponse(assets.excelJs,'text/javascript');
  if(request.method==='POST'&&url.pathname==='/admin/api/login'){const r=await adminLogin(request,env,body,now);return json({username:r.username},200,{'Set-Cookie':r.cookie});}
  const actor=await adminIdentity(request,env,now);const quotesResponse=await quotesAdmin(request,env,url,body,now,actor);if(quotesResponse)return quotesResponse;const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
  if(request.method==='GET'&&url.pathname==='/admin/api/me')return json({username:actor});
- if(request.method==='GET'&&url.pathname==='/admin/api/players')return json(await listPlayers(env,url.searchParams,countOptions(request,url.searchParams)));
+ if(request.method==='GET'&&['/admin/api/players','/admin/api/players/export'].includes(url.pathname))return json(await listPlayers(env,url.searchParams,{...countOptions(request,url.searchParams),exporting:url.pathname.endsWith('/export')}));
  const playerMatch=/^\/admin\/api\/players\/([^/]+)\/activity$/.exec(url.pathname);if(request.method==='GET'&&playerMatch)return json(await playerActivity(env,playerMatch[1],url.searchParams));
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
  if(request.method==='GET'&&url.pathname==='/admin/api/announcement')return json({announcement:await readAnnouncement(env)});
@@ -139,14 +143,7 @@ async function admin(request,env,url,body,now,assets){
    exactKeys(body,['status','note']);const id=url.pathname.split('/').at(-1);if(!['new','read','planned','done','closed','ignored'].includes(body.status))fail(400,'INVALID_STATUS','狀態不正確。');const note=text(body.note??'',0,2000,'管理筆記',true);
    const r=await env.DB.batch([stmt(env,'UPDATE sf_feedback SET status=?,not_handled=?,admin_note=?,updated_at=? WHERE id=?',body.status==='ignored'?'closed':body.status,body.status==='ignored'?1:0,note,now,id),stmt(env,'INSERT INTO sf_admin_audit(id,actor,action,target_id,created_at) VALUES (?,?,?,?,?)',crypto.randomUUID(),actor,'feedback-status',id,now)]);if(!r[0].meta.changes)fail(404,'NOT_FOUND','找不到這則回報。');return json({updated:true});
   }
-  if(request.method==='GET'&&url.pathname==='/admin/api/runs'){
-   const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),q=text(url.searchParams.get('q')||'',0,80,'查詢文字'),id=text(url.searchParams.get('id')||'',0,80,'成績編號'),state=url.searchParams.get('status')||'all',m=url.searchParams.get('mode')||'all',f=url.searchParams.get('financing')||'all',sort=url.searchParams.get('sort')||'latest';
-   const sorts={financing_total:"COALESCE(CAST(json_extract(margin_summary,'$.totalBorrowedCents') AS INTEGER),0) DESC,submitted_at DESC,id DESC",latest:'submitted_at DESC,id DESC',score:'score DESC,submitted_at DESC,id DESC',equity:'equity_cents DESC,id DESC',duration:'play_time_ms DESC,id DESC',trades:'trades DESC,id DESC',gain:'gain_cents DESC,id DESC',loss:'loss_cents ASC NULLS LAST,id DESC'};
-   if(!['all','active','revoked'].includes(state)||!['all','life','free'].includes(m)||!['all','cash','margin'].includes(f)||!Object.hasOwn(sorts,sort))fail(400,'INVALID_FILTER','查詢條件不正確。');
-   const clauses=[],args=[];if(q){clauses.push("nickname LIKE ? ESCAPE '\\'");args.push('%'+q.replace(/[\\%_]/g,'\\$&')+'%');}if(id){clauses.push('id=?');args.push(id);}if(state!=='all'){clauses.push('hidden=?');args.push(state==='revoked'?1:0);}if(m!=='all'){clauses.push('mode=?');args.push(m);}if(f!=='all'){clauses.push('financing=?');args.push(f==='margin'?1:0);}const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
-   const rows=await all(stmt(env,'SELECT id,nickname,mode,outcome,score,equity_cents,benchmark_cents,gain_cents,loss_cents,highlights,drawdown_bps,trades,hidden,moderation_note,submitted_at,financing,margin_summary,play_time_ms,play_time_partial,skill_uses,avatar_id,avatar_character,start_date,early_settlement_date,date_jumps FROM (SELECT r.*,p.nickname,p.avatar_id,p.avatar_character FROM sf_runs r JOIN sf_players p ON p.id=r.player_id)'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?',...args,page*50));
-   const count=await stmt(env,'SELECT COUNT(*) AS n FROM (SELECT r.*,p.nickname,p.avatar_id,p.avatar_character FROM sf_runs r JOIN sf_players p ON p.id=r.player_id)'+where,...args).first();return json({items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n});
-  }
+  if(request.method==='GET'&&['/admin/api/runs','/admin/api/runs/export'].includes(url.pathname))return json(await listRuns(env,url.searchParams,{exporting:url.pathname.endsWith('/export')}));
   if(request.method==='POST'&&/^\/admin\/api\/runs\/[a-zA-Z0-9_-]+\/(hide|restore)$/.test(url.pathname)){
    exactKeys(body,['note']);const id=url.pathname.split('/').at(-2),hidden=url.pathname.endsWith('/hide')?1:0,note=text(body.note,2,500,hidden?'註銷原因':'恢復原因');const row=await stmt(env,'SELECT player_id,edition FROM sf_runs WHERE id=?',id).first();if(!row)fail(404,'NOT_FOUND','找不到這筆成績。');
    const queries=[stmt(env,'UPDATE sf_runs SET hidden=?,moderation_note=? WHERE id=?',hidden,note,id),stmt(env,'DELETE FROM sf_best_scores WHERE player_id=? AND edition=?',row.player_id,row.edition)];
@@ -159,10 +156,10 @@ export async function handle(request,env,ctx={},assets={}){
  const url=new URL(request.url),isAdmin=url.pathname==='/admin'||url.pathname.startsWith('/admin/'),now=nowSeconds();let cors={};
  try{
   if(isAdmin){if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('x-admin-action')!=='1'))fail(403,'ORIGIN_DENIED','無法確認後台操作來源。');const body=request.method==='POST'?await readJson(request,32768):null;const response=await admin(request,env,url,body,now,assets);if(request.method==='POST'&&response.ok)await Promise.all([invalidatePublic(env),invalidateAdminCounts(env,request)]);return response;}
-  const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After, X-SF-Public-Cache'};
+  const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization, X-SF-Device','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After, X-SF-Public-Cache'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.32'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.33'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);
@@ -186,7 +183,7 @@ export async function handle(request,env,ctx={},assets={}){
   const body=await readJson(request);
   let response;
   if(url.pathname==='/v1/players'){
-   exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at,last_seen_at) VALUES (?,?,?,?)',id,await hash(token),now,now).run();response={playerId:id,playerToken:token};
+   exactKeys(body,[]);await rate(env,'players:'+ip,100,86400,now);const token=randomToken(),id=crypto.randomUUID();await stmt(env,'INSERT INTO sf_players(id,token_hash,created_at,last_seen_at,last_device_type) VALUES (?,?,?,?,?)',id,await hash(token),now,now,requestDevice(request)).run();response={playerId:id,playerToken:token};
   }else if(url.pathname==='/v1/profile'){response=await saveProfile(env,await player(request,env),body,now);
   }else if(url.pathname==='/v1/sessions'){
    exactKeys(body,['runId','mode','editionId','startDay','startDate']);const startDate=body.startDate??EDITION.start,startMeta=START_BENCHMARKS[startDate];if(!supportedEditions.includes(body.editionId))fail(400,'EDITION_MISMATCH','請重新整理以載入目前的排行版本。');if(!startMeta||body.startDay!==startMeta.index-1)fail(400,'RUN_ALREADY_STARTED','已開始的舊輪次不能補建線上 Session。');const p=await player(request,env),m=mode(body.mode),run=uuid(body.runId),requestedEdition=editionFor(m,'cash',body.editionId);await rate(env,'session-player:'+p,20,3600,now);await rate(env,'session-ip:'+ip,200,86400,now);

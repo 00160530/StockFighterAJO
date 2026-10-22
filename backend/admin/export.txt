@@ -1,0 +1,26 @@
+(function(root){'use strict';
+const devices={mobile:'手機',desktop:'電腦',tablet:'平板',unknown:'未記錄'},moods=['微笑','興奮','得意','認真','緊張','驚訝','哭哭','疲憊','生氣','期待'];
+const json=v=>{try{return JSON.parse(v||'{}')||{};}catch{return {};}};
+const cash=v=>typeof v==='number'?Math.round(v/100):null;
+const seconds=v=>typeof v==='number'?Math.round(v/1000):null;
+const taipei=v=>Number.isFinite(v)?new Date((v+8*3600)*1000):null;
+const playerColumns=[
+ ['玩家暱稱',r=>r.nickname||'尚未設定暱稱',24],['匿名玩家編號',r=>r.id,40],['最後上線時間',r=>taipei(r.last_seen_at),23,'date'],['最後上線裝置',r=>devices[r.last_device_type]||devices.unknown,18],['建立時間',r=>taipei(r.created_at),23,'date'],['人生模式完成次數',r=>r.life_completed_count,21],['自由模式完成次數',r=>r.free_completed_count,21],['上傳次數',r=>r.upload_count,14],['最長遊玩時長（秒）',r=>seconds(r.longest_play_time_ms),24],['頭像角色',r=>r.avatar_character==='xiaoxiaojiu'?'小小韭':'小韭',14],['心情頭像',r=>moods[(r.avatar_id||1)-1]||'微笑',14]
+];
+const runColumns=[
+ ['玩家暱稱',r=>r.nickname||'尚未設定暱稱',24],['匿名玩家編號',r=>r.player_id,40],['成績編號',r=>r.id,40],['上傳裝置',r=>devices[r.device_type]||devices.unknown,14],['模式',r=>r.mode==='life'?'人生模式':'自由模式',14],['結果',r=>r.outcome==='won'?'擊敗大盤':'未擊敗大盤',16],['最終總資產',r=>cash(r.equity_cents),20],['0050 平行人生',r=>cash(r.benchmark_cents),20],['超額報酬（百分點）',r=>r.score/100,23,'decimal'],['最大回撤（%）',r=>r.drawdown_bps/100,20,'decimal'],['單筆最大獲利',r=>cash(r.gain_cents),20],['單筆最大虧損',r=>cash(r.loss_cents),20],['交易次數',r=>r.trades,14],['遊玩時長（秒）',r=>seconds(r.play_time_ms),20],['時長紀錄',r=>r.play_time_ms==null?'未記錄':r.play_time_partial?'部分紀錄':'完整紀錄',16],['交易方式',r=>r.financing?'曾使用融資':'現股',17],['累計融資',r=>cash(json(r.margin_summary).totalBorrowedCents||0),20],['累計融資利息',r=>cash(json(r.margin_summary).totalInterestCents||0),20],['補繳保證金',r=>cash(json(r.margin_summary).totalTopupsCents||0),20],['斷頭次數',r=>json(r.margin_summary).liquidations||0,14],['媽媽10塊使用次數',r=>json(r.skill_uses).mother??null,23],['VIP使用次數',r=>json(r.skill_uses).vip??null,18],['奇門遁甲使用次數',r=>json(r.skill_uses).divination??null,23],['日期跳躍使用次數',r=>json(r.skill_uses).calendar??null,23],['起始遊戲日期',r=>r.start_date||'2020-01-02',18],['提前結算日期',r=>r.early_settlement_date||null,18],['日期跳躍紀錄',r=>r.date_jumps||'[]',44],['上傳時間',r=>taipei(r.submitted_at),23,'date'],['狀態',r=>r.hidden?'已註銷':'有效',14],['處理原因',r=>r.moderation_note||'',50]
+];
+function build(kind,items,filters=[],ExcelJS=root.ExcelJS){
+ if(!ExcelJS?.Workbook)throw Error('Excel 匯出元件未能載入，請重新整理後再試。');if(!['players','runs'].includes(kind)||!Array.isArray(items))throw Error('匯出資料不正確。');
+ const columns=kind==='players'?playerColumns:runColumns,book=new ExcelJS.Workbook();book.creator='台股戰士管理後台';book.title=kind==='players'?'查詢玩家':'排行榜成績';
+ const sheet=book.addWorksheet(book.title,{views:[{state:'frozen',ySplit:1,xSplit:2}]});sheet.columns=columns.map(c=>({header:c[0],width:c[2]}));
+ for(const item of items)sheet.addRow(columns.map(c=>c[1](item)));sheet.autoFilter={from:{row:1,column:1},to:{row:Math.max(1,sheet.rowCount),column:columns.length}};
+ columns.forEach((c,i)=>{sheet.getColumn(i+1).numFmt=c[3]==='date'?'yyyy/mm/dd hh:mm:ss':c[3]==='decimal'?'0.00':'#,##0;[Red]-#,##0;0';});
+ sheet.getRow(1).height=28;sheet.getRow(1).eachCell(cell=>{cell.font={name:'Microsoft JhengHei',bold:true,color:{argb:'FF365E46'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEAF2EC'}};cell.alignment={vertical:'middle',wrapText:true};});
+ const info=book.addWorksheet('匯出說明');info.columns=[{width:28},{width:80}];info.addRows([['匯出資料',book.title],['匯出筆數',items.length],['時間格式','日期時間均為台北時間（UTC+8）。'],['裝置資訊','依瀏覽器資訊判斷；舊紀錄未記錄裝置，不推定或回填。'],['資料範圍','目前篩選條件的全部結果，包含符合條件的已註銷成績。'],...filters]);return book;
+}
+let loading;
+function loadExcel(){if(root.ExcelJS?.Workbook)return Promise.resolve(root.ExcelJS);if(loading)return loading;loading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/admin/exceljs.js';script.onload=()=>root.ExcelJS?.Workbook?resolve(root.ExcelJS):reject(Error('Excel 元件載入失敗。'));script.onerror=()=>{script.remove();reject(Error('Excel 元件載入失敗，請重試。'));};document.head.append(script);}).catch(e=>{loading=null;throw e;});return loading;}
+async function download(kind,data,filters,valid=()=>true){const library=await loadExcel(),book=build(kind,data.items,filters,library),bytes=await book.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download='台股戰士-'+(kind==='players'?'查詢玩家':'排行榜成績')+'-'+new Date(Date.now()+8*3600000).toISOString().slice(0,10)+'.xlsx';if(!valid()){URL.revokeObjectURL(url);return;}document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+root.TaiguAdminExport={build,download};
+})(globalThis);
