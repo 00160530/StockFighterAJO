@@ -48,16 +48,17 @@ test('player query requires an admin session and validates filter inputs without
  for(const s of ['page=-1','page=0.5','page=10001','named=bad','uploads=bad','sort=created_at;DROP TABLE sf_players','q='+('a'.repeat(81)),'id='+('a'.repeat(121))])assert.equal((await a.call('/admin/api/players?'+s)).status,400);
  assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_players').get().n,1);
 });
-test('registration records connection time; authenticated reads refresh once per minute without regressing or accepting invalid identities',async t=>{
+test('registration records connection time; authenticated reads refresh once per ten minutes without regressing or accepting invalid identities',async t=>{
  let now=1800000000;t.mock.method(Date,'now',()=>now*1000);const a=await setup();
  const p=(await a.call('/v1/players',{}, {admin:false})).data;
  const seen=()=>a.DB.db.prepare('SELECT created_at,last_seen_at FROM sf_players WHERE id=?').get(p.playerId);
  assert.equal(seen().created_at,now);assert.equal(seen().last_seen_at,now);
- now+=59;assert.equal((await a.call('/v1/community',null,{admin:false,token:p.playerToken})).status,200);assert.equal(seen().last_seen_at,now-59);
+ now+=60;assert.equal((await a.call('/v1/community',null,{admin:false,token:p.playerToken})).status,200);assert.equal(seen().last_seen_at,now-60);
+ now+=539;await a.call('/v1/profile',null,{admin:false,token:p.playerToken});assert.equal(seen().last_seen_at,now-599);
  now++;await a.call('/v1/community',null,{admin:false,token:p.playerToken});assert.equal(seen().last_seen_at,now);
  now-=100;await a.call('/v1/profile',null,{admin:false,token:p.playerToken});assert.equal(seen().last_seen_at,now+100);
- now+=300;assert.equal((await a.call('/v1/profile',null,{admin:false,token:playerToken})).status,401);assert.equal(seen().last_seen_at,now-200);
- a.DB.db.prepare('UPDATE sf_players SET banned=1 WHERE id=?').run(p.playerId);assert.equal((await a.call('/v1/profile',null,{admin:false,token:p.playerToken})).status,401);assert.equal(seen().last_seen_at,now-200);
+ now+=900;assert.equal((await a.call('/v1/profile',null,{admin:false,token:playerToken})).status,401);assert.equal(seen().last_seen_at,now-800);
+ a.DB.db.prepare('UPDATE sf_players SET banned=1 WHERE id=?').run(p.playerId);assert.equal((await a.call('/v1/profile',null,{admin:false,token:p.playerToken})).status,401);assert.equal(seen().last_seen_at,now-800);
 });
 test('additive migration keeps historical identities and creation times; last online stays unknown until reconnection',async()=>{
  const DB=database({beforeMigration(db,name){if(name.startsWith('0020_'))db.prepare('INSERT INTO sf_players(id,token_hash,nickname,created_at) VALUES (?,?,?,?)').run('old-player','old-hash','原玩家',123);}});

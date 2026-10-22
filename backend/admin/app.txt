@@ -121,7 +121,7 @@ function showPlayerActivity(player,kind){
  prev.onclick=()=>{current=Math.max(0,current-1);load();};next.onclick=()=>{if(next.textContent!=='重新讀取')current++;next.textContent='下一頁 →';load();};load();
 }
 function playersPanel(rows){
- const panel=el('section',undefined,'admin-players');panel.append(el('p','上線時間為最後一次連線的時間，每分鐘最多更新一次；更新前的玩家會在下次連線後開始顯示。上傳次數包含已註銷的成績。'));
+ const panel=el('section',undefined,'admin-players');panel.append(el('p','上線時間為最後一次連線的時間，每 10 分鐘最多更新一次；更新前的玩家會在下次連線後開始顯示。上傳次數包含已註銷的成績。'));
  if(!rows.length){panel.append(el('div','沒有符合條件的玩家。','empty'));return panel;}
  const wrap=el('div',undefined,'player-table-wrap'),table=el('table',undefined,'player-table'),head=el('thead'),heading=el('tr');table.setAttribute('aria-label','匿名玩家查詢結果');
  for(const title of ['玩家暱稱／頭像','匿名玩家編號','最後上線時間','建立時間','人生模式完成次數','自由模式完成次數','上傳次數']){const th=el('th',title);th.scope='col';heading.append(th);}head.append(heading);table.append(head);
