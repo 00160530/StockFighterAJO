@@ -1,7 +1,8 @@
 import {fail,integer,text,uuid} from './security.mjs';
+import {adminCount,readAdminOverview} from './admin-counts.mjs';
 
 // Called only after admin authentication. Never return player/session credentials.
-export async function listPlayers(env,params){
+export async function listPlayers(env,params,options={}){
  const page=integer(Number(params.get('page')||0),0,10000,'頁數');
  const query=text(params.get('q')||'',0,80,'暱稱'),id=text(params.get('id')||'',0,120,'匿名玩家編號');
  const named=params.get('named')||'all',uploads=params.get('uploads')||'all',sort=params.get('sort')||'online';
@@ -13,8 +14,14 @@ export async function listPlayers(env,params){
  if(named!=='all')clauses.push(named==='yes'?"p.nickname IS NOT NULL AND p.nickname<>''":"(p.nickname IS NULL OR p.nickname='')");
  if(uploads!=='all')clauses.push((uploads==='no'?'NOT ':'')+'EXISTS (SELECT 1 FROM sf_runs r WHERE r.player_id=p.id)');
  const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
- const rows=(await env.DB.prepare('SELECT p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at,(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id) AS upload_count,(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode=\'life\') AS life_completed_count,(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode=\'free\') AS free_completed_count,(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id) AS longest_play_time_ms FROM sf_players p'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?').bind(...args,page*50).all()).results;
- const count=await env.DB.prepare('SELECT COUNT(*) AS n FROM sf_players p'+where).bind(...args).first();
+ const fields='p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at';
+ const stats={upload_count:'(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id)',life_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='life')",free_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='free')",longest_play_time_ms:'(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id)'};
+ const metric={uploads:'upload_count',life_completed:'life_completed_count',free_completed:'free_completed_count',duration:'longest_play_time_ms'}[sort],defer=!!metric;
+ // Preserve indexed simple sorts. Other sorts calculate only their ordering value before LIMIT.
+ const pageSql='SELECT '+fields+(metric?','+stats[metric]+' AS '+metric:'')+' FROM sf_players p'+where+' ORDER BY '+sorts[sort]+' LIMIT 51 OFFSET ?';
+ const sql=(defer?'WITH page AS MATERIALIZED ('+pageSql+') ':'')+'SELECT '+fields+','+Object.entries(stats).map(([key,value])=>(defer&&metric===key?'p.'+key:value)+' AS '+key).join(',')+' FROM '+(defer?'page':'sf_players')+' p'+(defer?'':where)+' ORDER BY '+sorts[sort]+(defer?'':' LIMIT 51 OFFSET ?');
+ const rows=(await env.DB.prepare(sql).bind(...args,page*50).all()).results;
+ const count=!clauses.length&&options.request?{n:(await readAdminOverview(env,options)).players}:await adminCount(env,'players-total:'+JSON.stringify([query,id,named,uploads]),()=>env.DB.prepare('SELECT COUNT(*) AS n FROM sf_players p'+where).bind(...args).first(),options);
  return {items:rows.slice(0,50),hasMore:rows.length>50,page,total:count.n};
 }
 
