@@ -1,8 +1,14 @@
+import {publicData} from './public-cache.mjs';
 import {exactKeys,fail,integer,text,uuid,player,rate} from './security.mjs';
 const q=(env,sql,...args)=>env.DB.prepare(sql).bind(...args),all=async s=>(await s.all()).results;
 const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const counts="(SELECT COUNT(*) FROM sf_poll_votes v WHERE v.poll_id=p.id AND v.choice='yes') AS yes,(SELECT COUNT(*) FROM sf_poll_votes v WHERE v.poll_id=p.id AND v.choice='no') AS no";
-export async function publicPolls(request,env,{activeOnly=false,page=0}={}){const who=request.headers.has('authorization')?await player(request,env):null;return all(q(env,'SELECT p.id,p.question,p.red_label,p.green_label,p.active,p.created_at,'+counts+',(SELECT choice FROM sf_poll_votes v WHERE v.poll_id=p.id AND v.player_id=?) AS myChoice FROM sf_polls p WHERE p.deleted_at IS NULL AND p.visible=1'+(activeOnly?' AND p.active=1':'')+' ORDER BY p.created_at DESC,p.id DESC LIMIT 51 OFFSET ?',who,page*50));}
+export async function publicPolls(request,env,{activeOnly=false,page=0}={}){
+ const who=request.headers.has('authorization')?await player(request,env):null;
+ const {data:items}=await publicData(request,env,'polls:'+activeOnly+':'+page,()=>all(q(env,'SELECT p.id,p.question,p.red_label,p.green_label,p.active,p.created_at,'+counts+' FROM sf_polls p WHERE p.deleted_at IS NULL AND p.visible=1'+(activeOnly?' AND p.active=1':'')+' ORDER BY p.created_at DESC,p.id DESC LIMIT 51 OFFSET ?',page*50)));
+ let choices=[];if(who&&items.length)choices=await all(q(env,'SELECT poll_id,choice FROM sf_poll_votes WHERE player_id=? AND poll_id IN ('+items.map(()=>'?').join(',')+')',who,...items.map(p=>p.id)));
+ const byId=new Map(choices.map(v=>[v.poll_id,v.choice]));return items.map(item=>({...item,myChoice:byId.get(item.id)??null}));
+}
 const completionBase="SELECT COUNT(*) AS total,COALESCE(SUM(c.outcome='won'),0) AS wins FROM sf_life_completions c";
 export async function lifeCounts(env){const c=await q(env,'WITH base AS ('+completionBase+') SELECT base.total,base.wins,COALESCE(k.total_adjustment,0) AS dt,COALESCE(k.wins_adjustment,0) AS dw FROM base LEFT JOIN sf_community_counters k ON k.id=1').first();const total=Math.max(0,c.total+c.dt);return {total,wins:Math.max(0,Math.min(total,c.wins+c.dw))};}
 export async function vote(request,env,id,body,now,ip){exactKeys(body,['choice']);uuid(id);if(!['yes','no'].includes(body.choice))fail(400,'INVALID_CHOICE','請選擇其中一個調查選項。');const who=await player(request,env);await rate(env,'vote-player:'+who,60,3600,now);await rate(env,'vote-ip:'+ip,300,3600,now);

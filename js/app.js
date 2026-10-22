@@ -332,7 +332,7 @@ function showLeaderboard(outcome='won',mode=state.mode,place='online'){
  $('editBoardAvatar').onclick=async()=>{if(await preparePlayer()){const p=await TaiguPlayerProfile.open({online,avatar:moodAvatar,defaultCharacter:characterProfile.selected});if(p)showLeaderboard(outcome,mode,place);}};
  const identityToken=online.read().player?.playerToken;if(identityToken)online.profile().then(profile=>updateBoardNickname(profile.nickname)).catch(()=>updateBoardNickname(online.read().lockedNickname||online.read().nickname,true));
  function updateBoardNickname(name,unavailable=false){if(request===boardRequest&&$('utilityDialog').open&&$('boardNickname')&&online.read().player?.playerToken===identityToken){$('boardNickname').innerHTML=TaiguBoard.nickname(name,{unavailable});$('editBoardAvatar').disabled=!name;$('editBoardAvatar').innerHTML=TaiguPlayerProfile.button(online.read(),moodAvatar);}}
- online.boards().then(snapshot=>{
+ online.boards(mode,outcome).then(snapshot=>{
   const board=snapshot.boards[mode][outcome];
   renderBoardResult(board);
  }).catch(error=>renderBoardResult(null,error));

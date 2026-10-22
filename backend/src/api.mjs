@@ -1,3 +1,5 @@
+import {publicData,invalidatePublic} from './public-cache.mjs';
+import {publicBoards} from './public-boards.mjs';
 import {boardSnapshot,category,scoreReceipt} from './boards.mjs';
 import {readProfile,saveProfile} from './profile.mjs';
 import {readAnnouncement,publishAnnouncement} from './announcements.mjs';
@@ -25,7 +27,7 @@ function bestInsert(env,runId,metric){const value=metric==='alpha'?'score':metri
  ON CONFLICT(player_id,edition,metric) DO UPDATE SET run_id=excluded.run_id,value=excluded.value,drawdown_bps=excluded.drawdown_bps,trades=excluded.trades,submitted_at=excluded.submitted_at
  WHERE excluded.value>sf_best_scores.value OR (excluded.value=sf_best_scores.value AND (excluded.drawdown_bps<sf_best_scores.drawdown_bps OR (excluded.drawdown_bps=sf_best_scores.drawdown_bps AND excluded.trades<sf_best_scores.trades)))`,metric,runId);}
 const order='b.value DESC,b.drawdown_bps ASC,b.trades ASC,b.submitted_at ASC,b.run_id ASC';
-async function ranking(env,m,board='won',playerId=null){const b=(await boardSnapshot(env,playerId))[m][category(board)];return playerId?b.entry:b.items;}
+async function ranking(env,m,board='won',playerId=null){const b=(await boardSnapshot(env,playerId,null,{mode:m,board:category(board),entryOnly:!!playerId}))[m][category(board)];return playerId?b.entry:b.items;}
 function boardOutcome(url){if(url.searchParams.get('metric')==='loss')fail(400,'INVALID_BOARD','線上翻車榜已移除。');return category(url.searchParams.get('category')||url.searchParams.get('outcome')||'won');}
 function highlight(raw,sign){if(raw===null)return null;if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'INVALID_HIGHLIGHT','交易高光不正確。');exactKeys(raw,['symbol','date','qty','priceCents','pnlCents','costBasisCents']);if(raw.costBasisCents!==undefined){integer(raw.costBasisCents,1,EDITION.maxEquityCents,'交易成本');const proceeds=raw.costBasisCents+raw.pnlCents;if(!Number.isSafeInteger(proceeds)||proceeds<0||proceeds>raw.priceCents*raw.qty)fail(400,'INVALID_HIGHLIGHT','交易成本與損益不一致。');}if(!EDITION.symbols.some(s=>s.id===raw.symbol)||typeof raw.date!=='string'||raw.date<EDITION.start||raw.date>EDITION.datasetEnd||!/^\d{4}-\d{2}-\d{2}$/.test(raw.date))fail(400,'INVALID_HIGHLIGHT','高光的標的或日期不正確。');integer(raw.qty,1,100000000*4,'高光股數');integer(raw.priceCents,1,100000000,'高光價格');integer(raw.pnlCents,-EDITION.maxEquityCents,EDITION.maxEquityCents,'高光損益');if(raw.pnlCents*sign<=0)fail(400,'INVALID_HIGHLIGHT','高光損益方向不正確。');return raw;}
 function marginSummary(raw){
@@ -155,8 +157,8 @@ fail(404,'NOT_FOUND','找不到這個後台功能。');
 export async function handle(request,env,ctx={},assets={}){
  const url=new URL(request.url),isAdmin=url.pathname==='/admin'||url.pathname.startsWith('/admin/'),now=nowSeconds();let cors={};
  try{
-  if(isAdmin){if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('x-admin-action')!=='1'))fail(403,'ORIGIN_DENIED','無法確認後台操作來源。');const body=request.method==='POST'?await readJson(request,32768):null;return await admin(request,env,url,body,now,assets);}
-  const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After'};
+  if(isAdmin){if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('x-admin-action')!=='1'))fail(403,'ORIGIN_DENIED','無法確認後台操作來源。');const body=request.method==='POST'?await readJson(request,32768):null;const response=await admin(request,env,url,body,now,assets);if(request.method==='POST'&&response.ok)await invalidatePublic(env);return response;}
+  const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After, X-SF-Public-Cache'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
   if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.32'},200,cors);
@@ -165,17 +167,17 @@ export async function handle(request,env,ctx={},assets={}){
   const ip=await ipKey(request,env);
    if(request.method==='GET'&&url.pathname==='/v1/quote-boards'){await rate(env,'read:'+ip,120,60,now);return json(await quoteBoards(request,env),200,cors);}
    if(request.method==='GET'&&url.pathname==='/v1/quotes'){await rate(env,'read:'+ip,120,60,now);return json(await quoteList(request,env,url.searchParams.get('tab')||'popular'),200,cors);}
-   if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);return json({completions:await lifeCounts(env),poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,cors);}
+   if(request.method==='GET'&&url.pathname==='/v1/community'){await rate(env,'read:'+ip,120,60,now);const counts=await publicData(request,env,'home-counts',()=>lifeCounts(env));return json({completions:counts.data,poll:(await publicPolls(request,env,{activeOnly:true}))[0]||null},200,{...cors,'X-SF-Public-Cache':'counts='+counts.status});}
    if(request.method==='GET'&&url.pathname==='/v1/polls'){await rate(env,'read:'+ip,120,60,now);const page=integer(Number(url.searchParams.get('page')||0),0,10000,'頁數'),items=await publicPolls(request,env,{page});return json({items:items.slice(0,50),hasMore:items.length>50,page},200,cors);}
   if(request.method==='GET'&&/^\/v1\/shares\/[a-zA-Z0-9_-]+$/.test(url.pathname)){await rate(env,'read:'+ip,120,60,now);const id=uuid(url.pathname.split('/').at(-1)),r=await stmt(env,'SELECT id,record_json,created_at FROM sf_shared_records WHERE id=?',id).first();if(!r)fail(404,'SHARE_NOT_FOUND','找不到這份分享紀錄，請確認連結是否完整。');return json({id:r.id,record:JSON.parse(r.record_json),createdAt:r.created_at},200,cors);}
-   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const [announcement,updates]=await Promise.all([readAnnouncement(env),readUpdates(env)]);return json({announcement,updates},200,cors);}
+   if(request.method==='GET'&&url.pathname==='/v1/announcement'){await rate(env,'read:'+ip,120,60,now);const cached=await publicData(request,env,'announcements',async()=>{const [announcement,updates]=await Promise.all([readAnnouncement(env),readUpdates(env)]);return {announcement,updates};});return json(cached.data,200,{...cors,'X-SF-Public-Cache':cached.status});}
   if(request.method==='GET'&&url.pathname==='/v1/profile'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env);return json(await readProfile(env,p),200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/boards'){
    await rate(env,'read:'+ip,120,60,now);const p=request.headers.has('authorization')?await player(request,env):null;
-   return json({edition:EDITION.id,boards:await boardSnapshot(env,p),verification:'basic',generatedAt:now},200,cors);
+   const requestedMode=url.searchParams.has('mode')?mode(url.searchParams.get('mode')):null,requestedBoard=url.searchParams.has('category')?category(url.searchParams.get('category')):null;const snapshot=await publicBoards(request,env,p,{mode:requestedMode,board:requestedBoard});return json({edition:EDITION.id,boards:snapshot.boards,verification:'basic',generatedAt:snapshot.generatedAt},200,{...cors,'X-SF-Public-Cache':snapshot.cache});
   }
    if(request.method==='GET'&&url.pathname==='/v1/leaderboard'){
-   await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({mode:m,outcome,edition:EDITION.id,items:await ranking(env,m,outcome),verification:'basic'},200,cors);
+   await rate(env,'read:'+ip,120,60,now);const m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({mode:m,outcome,edition:EDITION.id,items:(await publicBoards(request,env,null,{mode:m,board:outcome})).boards[m][outcome].items,verification:'basic'},200,cors);
   }
   if(request.method==='GET'&&url.pathname==='/v1/rank'){await rate(env,'read:'+ip,120,60,now);const p=await player(request,env),m=mode(url.searchParams.get('mode')||'life'),outcome=boardOutcome(url);return json({entry:await ranking(env,m,outcome,p)},200,cors);}
   if(request.method==='GET'&&url.pathname==='/v1/score-receipt'){const p=await player(request,env);await rate(env,'read:'+ip,120,60,now);const runId=uuid(url.searchParams.get('runId')),run=await stmt(env,'SELECT r.* FROM sf_runs r JOIN sf_sessions s ON s.id=r.session_id WHERE s.run_id=? AND r.player_id=?',runId,p).first();if(!run)fail(404,'RUN_NOT_FOUND','這輪尚未上傳。');return json(await scoreReceipt(env,run,p),200,cors);}

@@ -81,9 +81,11 @@ pnpm exec wrangler d1 migrations apply DB --config wrangler.local.jsonc --remote
 設定及資料表完成後，部署**自己的新環境**：
 
 ```sh
-pnpm exec wrangler deploy --config wrangler.local.jsonc
+node tools/publish.mjs --remote --config wrangler.local.jsonc --confirm-database YOUR_D1_DATABASE_ID
 pnpm exec wrangler secret put RATE_LIMIT_SECRET --config wrangler.local.jsonc
 ```
+
+發布工具會先同步本機更新公告，查詢公告 ID 並只匯入缺少的新公告，成功後才執行 Worker 部署。既有公告（含後台修改或刪除標記）不覆寫；讀取 API 不初始化。匯入失敗會停止部署，可安全重跑。請以自己的 D1 ID 取代 `YOUR_D1_DATABASE_ID`；後續每次發布也沿用此工具。若只做 Pages 發布、不更新 Worker，新增公告仍需先執行 `node tools/import-update-announcements.mjs --remote --config wrangler.local.jsonc --confirm-database YOUR_D1_DATABASE_ID`。
 
 第一次 `deploy` 會建立設定名稱對應的 Worker，輸出你的 HTTPS Worker URL。不要另用建立新專案的指令覆蓋這個遊戲資料夾。Secret 尚未設定完成時，部分 API 會回「服務尚未完成設定」。
 

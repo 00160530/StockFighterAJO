@@ -6,7 +6,7 @@ function completionPayload(r,session,config){const cents=n=>Math.round(n*100);if
 class CloudError extends Error{constructor(message,code='NETWORK_ERROR',extra={}){super(message);Object.assign(this,{code,...extra});}}
 function payload(r,session,config){const cents=n=>Math.round(n*100),highlight=t=>t?{symbol:t.id,date:t.date,qty:t.qty,priceCents:cents(t.price),pnlCents:cents(t.pnl),...(Number.isFinite(t.costBasis)&&t.costBasis>0?{costBasisCents:cents(t.costBasis)}:{})}:null;const equityCents=cents(r.equity),benchmarkCents=cents(r.benchmark);return {sessionId:session.sessionId,sessionToken:session.sessionToken,...(r.status==='bankrupt'?{cashCents:r.cash<0?Math.min(-1,cents(r.cash)):cents(r.cash)}:{}),editionId:config.editionId,mode:r.mode,playTimeMs:r.playTimeMs??null,playTimePartial:r.playTimePartial===true,skillUses:r.skillUses??null,startDate:r.startDate,customStartDate:r.customStartDate??null,earlySettlementDate:r.earlySettlementDate??null,...(r.dateJumps?.length?{dateJumps:r.dateJumps.map(j=>({...j}))}:{}),outcome:r.status,date:r.date,sessions:r.sessions,score:Math.round((equityCents-benchmarkCents)/10000),equityCents,benchmarkCents,drawdownBps:Math.round(r.maxDrawdown*100),trades:r.trades,buyTrades:r.buyTrades,sellTrades:r.sellTrades,maxGain:r.statsComplete?highlight(r.maxGain):null,maxLoss:r.statsComplete?highlight(r.maxLoss):null,...(r.margin?.totalBorrowed>0?{margin:{totalBorrowedCents:cents(r.margin.totalBorrowed),totalInterestCents:cents(r.margin.totalInterest),interestPaidCents:cents(r.margin.interestPaid),totalTopupsCents:cents(r.margin.totalTopups),liquidations:r.margin.liquidations,principalCents:cents(r.margin.principal),interestCents:cents(r.margin.interest),collateralCents:cents(r.margin.collateral)}}:{})};}
 class Client{
- constructor({config,storage,fetcher=root.fetch?.bind(root),now=()=>Date.now()}){this.config=config;this.storage=storage;this.fetcher=fetcher;this.now=now;this.starting=new Map();this.completing=new Map();this.submitting=new Map();this.profileSynced=false;this.registering=null;this.boardCache=null;this.boardPending=null;this.boardGeneration=0;this.quoteGeneration=0;this.quoteCache=null;this.quotePending=null;}
+ constructor({config,storage,fetcher=root.fetch?.bind(root),now=()=>Date.now()}){this.config=config;this.storage=storage;this.fetcher=fetcher;this.now=now;this.starting=new Map();this.completing=new Map();this.submitting=new Map();this.profileSynced=false;this.registering=null;this.boardCache=null;this.boardPending=null;this.scopedBoards=new Map();this.scopedBoardPending=new Map();this.boardGeneration=0;this.quoteGeneration=0;this.quoteCache=null;this.quotePending=null;}
  get enabled(){const base=this.config?.apiBase||'',local=['127.0.0.1','localhost','[::1]'].includes(root.location?.hostname);return /^https:\/\//.test(base)||(local&&/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?(?:\/|$)/.test(base));}
  read(){try{const a=JSON.parse(this.storage.getItem(KEY)||'null');return a&&a.version===1&&a.sessions&&a.receipts?a:{version:1,sessions:{},receipts:{},player:null};}catch{return {version:1,sessions:{},receipts:{},player:null};}}
  write(a){try{this.storage.setItem(KEY,JSON.stringify(a));}catch{throw new CloudError('瀏覽器無法保留匿名身分，這輪仍可繼續本機遊玩。','STORAGE_UNAVAILABLE');}}
@@ -61,21 +61,24 @@ class Client{
  abandonScore(id){const a=this.read();if(a.pendingScores?.[id]){a.pendingScores[id].status='abandoned';this.write(a);}}
  markNotified(id){const a=this.read();if(a.receipts[id]){a.receipts[id].notificationShown=true;this.write(a);}}
  async flushScores(){const result=[];for(const [id,entry]of Object.entries(this.read().pendingScores||{})){if(entry.status==='abandoned'||entry.expiresAt*1000<=this.now())continue;try{const receipt=await this.sendScore(id);if(receipt)result.push({id,receipt});}catch{}}return result;}
- invalidateBoards(){this.boardGeneration++;this.boardCache=null;this.boardPending=null;}
- async boards(){
+ invalidateBoards(){this.boardGeneration++;this.boardCache=null;this.boardPending=null;this.scopedBoards.clear();this.scopedBoardPending.clear();}
+ async boards(mode=null,category=null){
   const token=this.read().player?.playerToken||null,generation=this.boardGeneration;
   if(this.boardCache?.token===token&&this.now()<this.boardCache.expiresAt)return this.boardCache.data;
   if(this.boardPending?.token===token&&this.boardPending.generation===generation)return this.boardPending.promise;
+  const key=mode&&category?mode+':'+category:null,cached=key?this.scopedBoards.get(key):null,inflight=key?this.scopedBoardPending.get(key):null;
+  if(cached?.token===token&&this.now()<cached.expiresAt)return cached.data;
+  if(inflight?.token===token&&inflight.generation===generation)return inflight.promise;
   const pending={token,generation,promise:null};
-  pending.promise=this.request('/v1/boards',undefined,token).then(data=>{
+  pending.promise=this.request('/v1/boards'+(key?'?mode='+encodeURIComponent(mode)+'&category='+encodeURIComponent(category):''),undefined,token).then(data=>{
    for(const m of ['life','free'])for(const o of ['won','financing','gain','reincarnation'])if(!Array.isArray(data.boards?.[m]?.[o]?.items))throw new CloudError('排行榜資料不完整，請重新連線。');
-   if(this.boardGeneration===generation)this.boardCache={token,data,expiresAt:this.now()+BOARD_CACHE_MS};
+   if(this.boardGeneration===generation){const value={token,data,expiresAt:this.now()+BOARD_CACHE_MS};if(key)this.scopedBoards.set(key,value);else this.boardCache=value;}
    return data;
-  }).finally(()=>{if(this.boardPending===pending)this.boardPending=null;});
-  this.boardPending=pending;return pending.promise;
+  }).finally(()=>{if(key){if(this.scopedBoardPending.get(key)===pending)this.scopedBoardPending.delete(key);}else if(this.boardPending===pending)this.boardPending=null;});
+  if(key)this.scopedBoardPending.set(key,pending);else this.boardPending=pending;return pending.promise;
  }
- async leaderboard(mode,outcome='won'){return (await this.boards()).boards[mode][outcome];}
- async rank(mode,outcome='won'){return {entry:(await this.boards()).boards[mode][outcome].entry};}
+ async leaderboard(mode,outcome='won'){return (await this.boards(mode,outcome)).boards[mode][outcome];}
+ async rank(mode,outcome='won'){return {entry:(await this.boards(mode,outcome)).boards[mode][outcome].entry};}
  async share(record,requestId){const p=await this.identity();return this.request('/v1/shares',{requestId,record},p.playerToken);}
   async sharedRecord(id){return this.request('/v1/shares/'+encodeURIComponent(id));}
   async community(){return this.request('/v1/community',null,this.read().player?.playerToken);}

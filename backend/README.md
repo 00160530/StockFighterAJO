@@ -4,11 +4,21 @@
 
 玩家資料與自動上傳調整見 [PLAYER_PROFILE_BOARDS.md](../docs/PLAYER_PROFILE_BOARDS.md)。新增 Migration 0024、0025；sf_runs 不再保存暱稱或排行榜頭像，查詢改 JOIN sf_players。新榜單、重試與部署回復流程以該文件為準。以下含歷史版本設計說明。
 
-## v0.16.32：D1 限流暫停
+## v0.16.32：D1 寫入與重複執行優化
 
 第一階段將 `rate()` 改為不執行操作，保留所有呼叫位置，並停止 `sf_rate_limits` 過期清理。既有資料表與資料保留，不執行 Migration；同版另將玩家最後上線時間改為每 10 分鐘最多寫入一次，原有身分、Session、成績去重規則不變。
 
 目前暫停所有使用 `rate()` 的流量限制，包含公開讀取、玩家操作與後台登入；後台密碼、同源檢查仍有效。本次不加入替代限流，後續再導入 Cloudflare Workers 原生 Rate Limiting。
+
+公開榜單、公告、首頁完成總計與投票公開資訊加入 30 秒 Cache API 快取，個人名次／頭像／投票分開處理；結算只查該輪模式且保持即時。細節、短暫延遲與命中率觀測見 [排行榜快取](../docs/LEADERBOARD-CACHE.md)。本階段不增加摘要表或索引，無新 Migration。
+
+## 發布時匯入更新公告
+
+玩家及後台讀取公告不會初始化資料。發布前執行 `node tools/publish.mjs --remote --config wrangler.local.jsonc --confirm-database YOUR_D1_DATABASE_ID`（在 backend 目錄），工具會同步本機公告檔、查詢本次發行公告 ID，只匯入不存在的新 ID，成功後才部署 Worker。匯入失敗則停止發布，可修正後重跑。
+
+已存在的 ID 不會重新 INSERT，包括後台修改過的公告與刪除標記；不會覆蓋內容、修訂次數或復原已刪除公告。同版重新部署也不會重新插入該公告。如需修改已發布內容，請使用後台。
+
+只匯入但不部署可執行 `node tools/import-update-announcements.mjs --remote --config wrangler.local.jsonc --confirm-database YOUR_D1_DATABASE_ID`；本機測試使用 `--local --config FILE --persist-to DIRECTORY`。兩者皆需先備妥既有資料表，這項調整沒有新增 Migration。Wrangler build 的 `sync-update-announcements.mjs` 只產生本機 JSON，不存取 D1；直接執行 `wrangler deploy` 會略過公告匯入，正式發布請使用上述發布工具。
 
 ## 公告圖片及每天提醒
 

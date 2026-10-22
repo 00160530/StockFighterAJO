@@ -4,6 +4,18 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const c={window:{},setTimeout,clearTimeout,AbortController};vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../js/online.js',import.meta.url),'utf8'),c);const {Client,payload,KEY}=c.window.TaiguOnline,config={apiBase:'https://api.example.test',editionId:'edition-current'};
 const plain=x=>JSON.parse(JSON.stringify(x));
+
+test('displayed board requests only its own mode/category and caches scopes independently across tab switches',async()=>{
+ let now=1000;const calls=[],store=storage(),client=new Client({config,storage:store,now:()=>now,fetcher:async url=>{calls.push(url);const value=snapshot(),u=new URL(url);value.scope=u.search;return Response.json(value);}});
+ const one=await client.boards('life','won');await Promise.all([client.boards('free','gain'),client.boards('free','gain')]);assert.equal(calls.length,2);assert.equal(calls[0],config.apiBase+'/v1/boards?mode=life&category=won');assert.equal(calls[1],config.apiBase+'/v1/boards?mode=free&category=gain');assert.equal((await client.boards('life','won')).scope,one.scope);assert.equal(calls.length,2);
+ now+=300000;await client.boards('life','won');assert.equal(calls.length,3);client.invalidateBoards();await client.boards('free','gain');assert.equal(calls.length,4);
+ store.setItem(KEY,JSON.stringify({version:1,sessions:{},receipts:{},player:{playerToken:'a'.repeat(64)}}));await client.boards('free','gain');assert.equal(calls.length,5);
+});
+
+test('stale scoped reads after invalidation never replace the new identity snapshot',async()=>{
+ let release,count=0;const client=new Client({config,storage:storage(),fetcher:async()=>{if(++count===1)return new Promise(resolve=>release=()=>resolve(Response.json({...snapshot(),tag:'old'})));return Response.json({...snapshot(),tag:'new'});}});
+ const old=client.boards('life','won');client.invalidateBoards();assert.equal((await client.boards('life','won')).tag,'new');release();await old;assert.equal((await client.boards('life','won')).tag,'new');assert.equal(count,2);
+});
 function storage(){const m=new Map();return {getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)};}
 function stub(){const calls=[],s={sessionId:'session-uuid',sessionToken:'b'.repeat(64),createdAt:1,expiresAt:100000,mode:'life',editionId:config.editionId};const fetcher=async(url,options)=>{calls.push({url,options,body:options.body?JSON.parse(options.body):null});return Response.json(url.endsWith('/v1/players')?{playerId:'player-uuid',playerToken:'a'.repeat(64)}:url.endsWith('/v1/sessions')?s:url.endsWith('/v1/scores')?{submitted:true,notifications:[],rank:{rank:2}}:{received:true,id:'feedback-uuid'});};return {fetcher,calls,s};}
 const summary={id:'run-uuid',mode:'life',status:'won',date:'2026-10-16',sessions:1649,equity:6000000,benchmark:5499571.81,maxDrawdown:12.345,trades:2,buyTrades:1,sellTrades:1,statsComplete:true,maxGain:{id:'0050',date:'2024-01-02',qty:1000,price:130.25,pnl:10000.35},maxLoss:null,history:[{private:'not uploaded'}],log:['private'],cash:123};
