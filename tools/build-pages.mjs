@@ -18,7 +18,7 @@ export function buildPages({root=project,target=path.join(root,'work/pages'),env
   if(relative.startsWith('js/'))return path.extname(p)==='.js'||['js/vendor/exceljs.LICENSE','js/vendor/README.md'].includes(relative);
   if(relative.startsWith('css/'))return path.extname(p)==='.css';
   if(relative.startsWith('Art/'))return /\.(html|css|js|json|txt|png|webp|jpg|jpeg|gif|svg)$/.test(p);
-  return /\.(png|webp|svg|wav|mp3|ogg)$/.test(p)||['assets/audio/manifest.json','assets/audio/scores.json'].includes(relative);
+  return /\.(png|jpe?g|webp|svg|wav|mp3|ogg)$/.test(p)||['assets/audio/manifest.json','assets/audio/scores.json'].includes(relative);
  };
  for(const name of ['index.html','.nojekyll'])fs.copyFileSync(path.join(root,name),path.join(target,name));
  for(const name of ['assets','css','js'])fs.cpSync(path.join(root,name),path.join(target,name),{recursive:true,filter:safe});
