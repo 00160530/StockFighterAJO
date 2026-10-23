@@ -114,10 +114,13 @@ async function admin(request,env,url,body,now,assets){
  if(request.method==='GET'&&url.pathname==='/admin/style.css')return adminResponse(assets.css,'text/css');
  if(request.method==='GET'&&url.pathname==='/admin/app.js')return adminResponse(assets.js,'text/javascript');
  if(request.method==='GET'&&url.pathname==='/admin/export.js')return adminResponse(assets.exportJs,'text/javascript');
+ if(request.method==='GET'&&url.pathname==='/admin/snapshot.js')return adminResponse(assets.snapshotJs,'text/javascript');
  if(request.method==='GET'&&url.pathname==='/admin/exceljs.js')return adminResponse(assets.excelJs,'text/javascript');
  if(request.method==='POST'&&url.pathname==='/admin/api/login'){const r=await adminLogin(request,env,body,now);return json({username:r.username},200,{'Set-Cookie':r.cookie});}
  const actor=await adminIdentity(request,env,now);const quotesResponse=await quotesAdmin(request,env,url,body,now,actor);if(quotesResponse)return quotesResponse;const communityResponse=await communityAdmin(request,env,url,body,now,actor);if(communityResponse)return communityResponse;
  if(request.method==='GET'&&url.pathname==='/admin/api/me')return json({username:actor});
+ if(request.method==='GET'&&url.pathname==='/admin/api/players/all')return json(await listPlayers(env,new URLSearchParams(),{snapshot:true}));
+ if(request.method==='GET'&&url.pathname==='/admin/api/runs/all')return json(await listRuns(env,new URLSearchParams(),{snapshot:true}));
  if(request.method==='GET'&&['/admin/api/players','/admin/api/players/export'].includes(url.pathname))return json(await listPlayers(env,url.searchParams,{...countOptions(request,url.searchParams),exporting:url.pathname.endsWith('/export')}));
  const playerMatch=/^\/admin\/api\/players\/([^/]+)\/activity$/.exec(url.pathname);if(request.method==='GET'&&playerMatch)return json(await playerActivity(env,playerMatch[1],url.searchParams));
  if(request.method==='POST'&&url.pathname==='/admin/api/logout')return json({loggedOut:true},200,{'Set-Cookie':await adminLogout(request,env)});
@@ -159,7 +162,7 @@ export async function handle(request,env,ctx={},assets={}){
   const allowed=originAllowed(request,env);if(allowed)cors={'Access-Control-Allow-Origin':request.headers.get('origin'),'Vary':'Origin','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization, X-SF-Device','Access-Control-Max-Age':'600','Access-Control-Expose-Headers':'Retry-After, X-SF-Public-Cache'};
   if(request.headers.has('origin')&&!allowed)fail(403,'ORIGIN_DENIED','這個網站無法使用遊戲 API。');
   if(request.method==='OPTIONS'){if(!allowed)fail(403,'ORIGIN_DENIED','來源不在允許清單。');return new Response(null,{status:204,headers:cors});}
-  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.33'},200,cors);
+  if(request.method==='GET'&&url.pathname==='/health')return json({ok:true,version:'0.16.34'},200,cors);
   if(request.method==='GET'&&url.pathname==='/v1/config')return json({edition:EDITION,verification:'basic',feedbackEnabled:true},200,cors);
   if(!env.DB)fail(503,'NOT_CONFIGURED','資料庫尚未完成設定。');
   const ip=await ipKey(request,env);

@@ -1,0 +1,22 @@
+(function(root){'use strict';
+const cmp=(a,b)=>a<b?-1:a>b?1:0,desc=(a,b)=>cmp(b,a),nullable=(a,b,down=false)=>a==null?(b==null?0:1):b==null?-1:(down?desc(a,b):cmp(a,b));
+const fold=v=>String(v||'').replace(/[A-Z]/g,c=>c.toLowerCase());
+// Match SQLite NOCASE/LIKE ASCII folding and UTF-8 BINARY code-point order.
+const binary=(a,b)=>{const x=Array.from(String(a||''),c=>c.codePointAt(0)),y=Array.from(String(b||''),c=>c.codePointAt(0));for(let i=0;i<Math.min(x.length,y.length);i++){const n=cmp(x[i],y[i]);if(n)return n;}return cmp(x.length,y.length);},contains=(v,q)=>fold(v).includes(fold(q).trim());
+const borrow=r=>{try{return Number(JSON.parse(r.margin_summary||'{}')?.totalBorrowedCents)||0;}catch{return 0;}};
+function rows(kind,items,p={}){
+ const players=kind==='players',out=items.filter(r=>{if(!contains(r.nickname,p.q))return false;if(players){if(!contains(r.id,p.id))return false;const named=!!r.nickname,uploaded=r.upload_count>0;if(p.named==='yes'&&!named||p.named==='no'&&named||p.uploads==='yes'&&!uploaded||p.uploads==='no'&&uploaded)return false;return !p.device||p.device==='all'||r.last_device_type===p.device;}
+ if(p.id&&r.id!==p.id||!contains(r.player_id,p.playerId)||p.status==='active'&&r.hidden||p.status==='revoked'&&!r.hidden||p.mode&&p.mode!=='all'&&r.mode!==p.mode||p.financing==='margin'&&!r.financing||p.financing==='cash'&&r.financing)return false;return !p.device||p.device==='all'||r.device_type===p.device;});
+ const playerSort={online:(a,b)=>nullable(a.last_seen_at,b.last_seen_at,true)||binary(b.id,a.id),newest:(a,b)=>desc(a.created_at,b.created_at)||binary(b.id,a.id),oldest:(a,b)=>cmp(a.created_at,b.created_at)||binary(a.id,b.id),nickname:(a,b)=>(a.nickname==null?(b.nickname==null?0:1):b.nickname==null?-1:binary(fold(a.nickname),fold(b.nickname)))||binary(a.id,b.id)};
+ const metrics={uploads:'upload_count',life_completed:'life_completed_count',free_completed:'free_completed_count',duration:'longest_play_time_ms'},m=metrics[p.sort];
+ const runSort={latest:(a,b)=>desc(a.submitted_at,b.submitted_at)||binary(b.id,a.id),score:(a,b)=>desc(a.score,b.score)||desc(a.submitted_at,b.submitted_at)||binary(b.id,a.id),equity:(a,b)=>desc(a.equity_cents,b.equity_cents)||binary(b.id,a.id),duration:(a,b)=>nullable(a.play_time_ms,b.play_time_ms,true)||binary(b.id,a.id),trades:(a,b)=>desc(a.trades,b.trades)||binary(b.id,a.id),gain:(a,b)=>nullable(a.gain_cents,b.gain_cents,true)||binary(b.id,a.id),loss:(a,b)=>nullable(a.loss_cents,b.loss_cents)||binary(b.id,a.id),financing_total:(a,b)=>desc(borrow(a),borrow(b))||desc(a.submitted_at,b.submitted_at)||binary(b.id,a.id)};
+ return out.sort(players?(m?((a,b)=>nullable(a[m],b[m],true)||desc(a.created_at,b.created_at)||binary(b.id,a.id)):playerSort[p.sort]||playerSort.online):runSort[p.sort]||runSort.latest);
+}
+function createStore(fetcher,now=()=>Date.now()){
+ const values=new Map(),pending=new Map();let generation=0;
+ return {clear(){generation++;values.clear();pending.clear();},peek:kind=>values.get(kind)||null,
+ async query(kind,{force=false}={}){if(!['players','runs'].includes(kind))throw Error('無效列表');const current=values.get(kind);if(!force&&current&&now()-current.at<30000)return current;const key=generation+':'+kind;if(pending.has(key))return pending.get(key);const epoch=generation,work=(async()=>{const data=await fetcher(kind+'/all');if(!data||!Array.isArray(data.items)||data.items.length!==data.total)throw Error('未取得完整資料，請重試查詢。');const result={items:data.items,total:data.total,fetchedAt:data.fetchedAt,at:now()};if(epoch===generation)values.set(kind,result);return result;})();pending.set(key,work);try{return await work;}finally{if(pending.get(key)===work)pending.delete(key);}}
+ };
+}
+root.TaiguAdminSnapshot={rows,createStore};
+})(globalThis);

@@ -7,3 +7,4 @@ work/
 .dev.vars*
 *.private.json
 data/online-config.local.js
+analysis/

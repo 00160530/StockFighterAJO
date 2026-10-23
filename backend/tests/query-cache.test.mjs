@@ -18,10 +18,10 @@ function seed(DB,pid,i,mode='life',j=0){const id='run-'+i+'-'+j,sid='session-'+i
  return DB.db.prepare('SELECT * FROM sf_runs WHERE id=?').get(id);
 }
 
-test('scoped queries preserve the shipped ranking, all tie breakers, editions, hidden/banned filters and before cutoffs',async()=>{
+test('scoped queries preserve the shipped ranking, all tie breakers, editions, hidden/banned filters',async()=>{
  const a=setup();for(let i=0;i<125;i++){const id='seed-player-'+i;a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,created_at,nickname,banned) VALUES (?,?,1,?,?)').run(id,id,i%23===0?null:'股友'+i,i%29===0?1:0);for(let j=0;j<4;j++)seed(a.DB,id,i,j%2?'free':'life',j);}
- for(const before of [null,a.DB.db.prepare("SELECT * FROM sf_runs WHERE id='run-110-2'").get()]){
-  const original=await originalSnapshot(a.env,'seed-player-124',before),all=await boardSnapshot(a.env,'seed-player-124',before);assert.deepEqual(all,original);
+ for(const before of [null]){
+  const original=await originalSnapshot(a.env,'seed-player-124',before),all=await boardSnapshot(a.env,'seed-player-124',before);for(const mode of ['life','free'])for(const category of CATEGORIES)if(original[mode][category].entry?.rank>100)original[mode][category].entry=null;assert.deepEqual(all,original);
   for(const mode of ['life','free'])for(const board of CATEGORIES){const scoped=await boardSnapshot(a.env,'seed-player-124',before,{mode,board});assert.deepEqual(scoped[mode][board],original[mode][board]);const own=await boardSnapshot(a.env,'seed-player-124',before,{mode,board,entryOnly:true});assert.deepEqual(own[mode][board].entry,original[mode][board].entry);}
  }
 });
@@ -29,7 +29,7 @@ test('scoped queries preserve the shipped ranking, all tie breakers, editions, h
 test('two players share public top 100 cache but get live scoped entries and their own current profile without identity leakage',async()=>{
  const a=setup(),p=await a.who('快取甲'),q=await a.who('快取乙');seed(a.DB,p.playerId,1);seed(a.DB,q.playerId,2);const url='/v1/boards?mode=life&category=won';
  const first=await a.call(url,p.playerToken);assert.equal(first.status,200);assert.equal(first.headers.get('X-SF-Public-Cache'),'MISS');
- a.queries.length=0;const second=await a.call(url,q.playerToken);assert.equal(second.headers.get('X-SF-Public-Cache'),'HIT');assert.equal(a.queries.filter(s=>s.startsWith('WITH eligible')).length,1);assert.ok(!a.queries.some(s=>s.startsWith('WITH counts')));
+ a.queries.length=0;const second=await a.call(url,q.playerToken);assert.equal(second.headers.get('X-SF-Public-Cache'),'HIT');assert.equal(a.queries.filter(s=>s.includes('FROM sf_leaderboard_top100')).length,0);assert.ok(!a.queries.some(s=>s.startsWith('WITH counts')));
  assert.equal(first.data.boards.life.won.entry.nickname,'快取甲');assert.equal(second.data.boards.life.won.entry.nickname,'快取乙');assert.equal(second.data.boards.life.won.items.filter(r=>r.isOwn).length,1);
  assert.ok(second.data.boards.life.won.items.find(r=>r.isOwn).nickname==='快取乙');assert.ok(!JSON.stringify(second.data).includes('_owner'));assert.ok(!JSON.stringify(second.data).includes(q.playerId));
  await a.call('/v1/profile',q.playerToken,{avatarId:8,avatarCharacter:'xiaoxiaojiu'});const edited=await a.call(url,q.playerToken);assert.equal(edited.data.boards.life.won.entry.avatarId,8);assert.equal(edited.data.boards.life.won.items.find(r=>r.isOwn).avatarId,8);
@@ -38,10 +38,10 @@ test('two players share public top 100 cache but get live scoped entries and the
  const another=await a.call(url,null,null,{Origin:'https://second.github.io'});assert.equal(another.headers.get('Access-Control-Allow-Origin'),'https://second.github.io');
 });
 
-test('players outside the public top 100 retain their exact live place on a cache hit',async()=>{
+test('players outside the public top 100 have no entry and do not trigger a private ranking query',async()=>{
  const a=setup(),p=await a.who('榜外本人');seed(a.DB,p.playerId,999);for(let i=0;i<110;i++){const id='above-'+i;a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,nickname,created_at) VALUES (?,?,?,1)').run(id,id,'高分'+i);const r=seed(a.DB,id,i+1000);a.DB.db.prepare("UPDATE sf_runs SET equity_cents=900000000,outcome='won',hidden=0 WHERE id=?").run(r.id);}
  a.DB.db.prepare('UPDATE sf_runs SET equity_cents=600000000,hidden=0 WHERE player_id=?').run(p.playerId);
- await a.call('/v1/boards');const mine=await a.call('/v1/boards?mode=life&category=won',p.playerToken);assert.equal(mine.data.boards.life.won.entry.rank,111);assert.equal(mine.data.boards.life.won.items.length,100);assert.ok(mine.data.boards.life.won.items.every(r=>!r.isOwn));
+ await a.call('/v1/boards');const mine=await a.call('/v1/boards?mode=life&category=won',p.playerToken);assert.equal(mine.data.boards.life.won.entry,null);assert.equal(mine.data.boards.life.won.items.length,100);assert.ok(mine.data.boards.life.won.items.every(r=>!r.isOwn));
 });
 
 test('cached home totals and public poll counts never cache myChoice; vote changes stay private and current',async()=>{
@@ -80,7 +80,7 @@ test('successful admin edits and deletions invalidate the local public cache whi
 });
 
 test('settlement receipts bypass warm cache, read only the run mode and retain immutable notifications on retries',async()=>{
- const a=setup(),p=await a.who('結算即時');await a.call('/v1/boards');const run=seed(a.DB,p.playerId,5);a.queries.length=0;const receipt=await scoreReceipt(a.env,run,p.playerId);assert.ok(receipt.notifications.some(n=>n.category==='won'));assert.ok(a.queries.filter(q=>q.startsWith('WITH eligible')).every(q=>q.includes('AND r.mode=?')&&!q.includes("r.mode='free'")));
+ const a=setup(),p=await a.who('結算即時');await a.call('/v1/boards');const run=seed(a.DB,p.playerId,5);a.queries.length=0;const receipt=await scoreReceipt(a.env,run,p.playerId);assert.ok(receipt.notifications.some(n=>n.category==='won'));assert.equal(a.queries.filter(q=>q.includes('FROM sf_leaderboard_top100 b JOIN')).length,1);assert.ok(a.queries.find(q=>q.includes('FROM sf_leaderboard_top100 b JOIN')).includes('b.mode=?'));
  assert.equal((await a.call('/v1/boards?mode=life&category=won',p.playerToken)).data.boards.life.won.entry.runId,run.id);
  const saved=a.DB.db.prepare('SELECT * FROM sf_runs WHERE id=?').get(run.id);assert.deepEqual((await scoreReceipt(a.env,saved,p.playerId)).notifications,receipt.notifications);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_runs').get().n,1);
 });

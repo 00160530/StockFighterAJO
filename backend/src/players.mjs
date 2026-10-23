@@ -5,6 +5,7 @@ import {MAX_EXPORT_ROWS} from './admin-runs.mjs';
 
 // Called only after admin authentication. Never return player/session credentials.
 export async function listPlayers(env,params,options={}){
+ if(options.snapshot){const items=(await env.DB.prepare('SELECT p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at,p.last_device_type,p.life_completed_count,p.free_completed_count,(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id) upload_count,(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id) longest_play_time_ms FROM sf_players p').all()).results;return {items,total:items.length,fetchedAt:nowSeconds()};}
  const page=integer(Number(params.get('page')||0),0,10000,'頁數');
  const query=text(params.get('q')||'',0,80,'暱稱'),id=text(params.get('id')||'',0,120,'匿名玩家編號');
  const named=params.get('named')||'all',uploads=params.get('uploads')||'all',sort=params.get('sort')||'online',device=params.get('device')||'all',exporting=options.exporting===true,size=exporting?MAX_EXPORT_ROWS:50;
@@ -17,12 +18,13 @@ export async function listPlayers(env,params,options={}){
  if(uploads!=='all')clauses.push((uploads==='no'?'NOT ':'')+'EXISTS (SELECT 1 FROM sf_runs r WHERE r.player_id=p.id)');
  if(device!=='all'){clauses.push('p.last_device_type=?');args.push(device);}
  const where=clauses.length?' WHERE '+clauses.join(' AND '):'';
- const fields='p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at,p.last_device_type';
- const stats={upload_count:'(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id)',life_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='life')",free_completed_count:"(SELECT COUNT(*) FROM sf_life_completions c JOIN sf_sessions s ON s.id=c.session_id WHERE c.player_id=p.id AND s.mode='free')",longest_play_time_ms:'(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id)'};
+ const fields='p.id,p.nickname,p.avatar_id,p.avatar_character,p.created_at,p.last_seen_at,p.last_device_type,p.life_completed_count,p.free_completed_count';
+ const stats={upload_count:'(SELECT COUNT(*) FROM sf_runs r WHERE r.player_id=p.id)',life_completed_count:'p.life_completed_count',free_completed_count:'p.free_completed_count',longest_play_time_ms:'(SELECT MAX(c.play_time_ms) FROM sf_life_completions c WHERE c.player_id=p.id)'};
  const metric={uploads:'upload_count',life_completed:'life_completed_count',free_completed:'free_completed_count',duration:'longest_play_time_ms'}[sort],defer=!!metric;
  // Preserve indexed simple sorts. Other sorts calculate only their ordering value before LIMIT.
- const limit=' LIMIT '+(size+1)+' OFFSET ?',pageSql='SELECT '+fields+(metric?','+stats[metric]+' AS '+metric:'')+' FROM sf_players p'+where+' ORDER BY '+sorts[sort]+limit;
- const sql=(defer?'WITH page AS MATERIALIZED ('+pageSql+') ':'')+'SELECT '+fields+','+Object.entries(stats).map(([key,value])=>(defer&&metric===key?'p.'+key:value)+' AS '+key).join(',')+' FROM '+(defer?'page':'sf_players')+' p'+(defer?'':where)+' ORDER BY '+sorts[sort]+(defer?'':limit);
+ const stored=new Set(['life_completed_count','free_completed_count']);
+ const limit=' LIMIT '+(size+1)+' OFFSET ?',pageSql='SELECT '+fields+(metric&&!stored.has(metric)?','+stats[metric]+' AS '+metric:'')+' FROM sf_players p'+where+' ORDER BY '+sorts[sort]+limit;
+ const sql=(defer?'WITH page AS MATERIALIZED ('+pageSql+') ':'')+'SELECT '+fields+','+Object.entries(stats).filter(([key])=>!stored.has(key)).map(([key,value])=>(defer&&metric===key?'p.'+key:value)+' AS '+key).join(',')+' FROM '+(defer?'page':'sf_players')+' p'+(defer?'':where)+' ORDER BY '+sorts[sort]+(defer?'':limit);
  const rows=(await env.DB.prepare(sql).bind(...args,exporting?0:page*size).all()).results;
  if(exporting){if(rows.length>MAX_EXPORT_ROWS)fail(413,'EXPORT_TOO_LARGE','一次最多匯出 10,000 筆，請縮小篩選條件後再試。');return {items:rows,total:rows.length,exportedAt:nowSeconds()};}
  const count=!clauses.length&&options.request?{n:(await readAdminOverview(env,options)).players}:await adminCount(env,'players-total:'+JSON.stringify([query,id,named,uploads,device]),()=>env.DB.prepare('SELECT COUNT(*) AS n FROM sf_players p'+where).bind(...args).first(),options);

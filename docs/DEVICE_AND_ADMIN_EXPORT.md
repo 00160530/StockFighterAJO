@@ -1,5 +1,9 @@
 # 裝置紀錄、後台查詢與匯出
 
+0.16.34 新後台改為一次取得全部資料，在目前頁面內篩選、排序、分頁與匯出，不再呼叫下述舊 `/export` API，也不受舊 API 的 10,000 筆上限限制。舊 API 保留相容；現行操作與暫存規則見 [排行榜與後台查詢摘要](TOP100_AND_ADMIN_SNAPSHOTS.md)。裝置判斷與保存規則維持本文件說明。
+
+0.16.34 新後台改為一次取得全部資料，在目前頁面內篩選、排序、分頁與匯出，不再呼叫下述舊 `/export` API，也不受舊 API 的 10,000 筆上限限制。舊 API 保留相容；現行操作與暫存規則見 [排行榜與後台查詢摘要](TOP100_AND_ADMIN_SNAPSHOTS.md)。裝置判斷與保存規則維持本文件說明。
+
 v0.16.33 使用 Migration `0026_device_types.sql`，為 `sf_players` 增加 `last_device_type`、為 `sf_runs` 增加 `device_type`。值為 mobile、desktop、tablet、unknown，歷史資料預設 unknown，不推定以前使用的裝置。沒有新增索引、統計表、Token 或完整 User-Agent 紀錄。
 
 前端只在玩家建立與有匿名 Token 的請求附上 `X-SF-Device`，以瀏覽器資訊判斷，另用觸控點區分 iPad 的桌面瀏覽模式。Worker 只接受合法值，沒有提示時以 User-Agent 判斷。這是瀏覽器回報的統計分類，不參與身分、Session、計分或防作弊判定，也不以螢幕寬度區分裝置。

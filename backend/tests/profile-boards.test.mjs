@@ -50,19 +50,19 @@ test('only a first top-100 entry or a higher personal best receives a winning-bo
  assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,3);
  s=await a.start(p);const tied=score(s,700000000);tied.maxGain.pnlCents=200000;r=await a.call('/v1/scores',tied,p);assert.equal(r.data.notifications.find(n=>n.category==='won').kind,'best');
 });
-test('players below 100 receive their real position without an award or any other player marked as themselves',async()=>{
+test('players below 100 receive no entry or award and never mark another player',async()=>{
  const a=setup(),p=await a.player('榜外玩家'),edition=EDITION.id+':'+EDITION.rulesets.life;
  for(let i=0;i<101;i++){
   const id='top-'+i;a.DB.db.prepare('INSERT INTO sf_players(id,token_hash,nickname,created_at) VALUES (?,?,?,1)').run(id,id,'榜上股友'+i);
-  for(let j=0;j<2;j++){const sid=id+'-'+j;a.DB.db.prepare("INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,'life',?,1,9999999999)").run(sid,id,sid,sid,edition);a.DB.db.prepare("INSERT INTO sf_life_completions VALUES (?,?,'won',1,NULL,NULL)").run(sid,id);}
+  for(let j=0;j<2;j++){const sid=id+'-'+j;a.DB.db.prepare("INSERT INTO sf_sessions(id,player_id,run_id,token_hash,mode,edition,created_at,expires_at) VALUES (?,?,?,?,'life',?,1,9999999999)").run(sid,id,sid,sid,edition);a.DB.db.prepare("INSERT INTO sf_life_completions(session_id,player_id,outcome,created_at,play_time_ms,play_time_partial) VALUES (?,?,'won',1,NULL,NULL)").run(sid,id);}
   a.DB.db.prepare("INSERT INTO sf_runs(id,session_id,player_id,edition,mode,outcome,score,equity_cents,benchmark_cents,drawdown_bps,trades,gain_cents,highlights,submitted_at) VALUES (?,?,?,?,'life','won',0,800000000,?,0,0,200000,'{}',1)").run(id,id+'-0',id,edition,EDITION.benchmarkCents);
  }
  const s=await a.start(p),r=await a.call('/v1/scores',score(s),p);assert.equal(r.status,200);assert.deepEqual(r.data.notifications,[]);
- const b=(await a.call('/v1/boards',null,p)).data.boards.life;for(const category of ['won','gain','reincarnation']){assert.equal(b[category].items.length,100);assert.equal(b[category].entry.rank,102);assert.ok(b[category].items.every(row=>!row.isOwn));assert.equal(b[category].entry.isOwn,true);}
+ const b=(await a.call('/v1/boards',null,p)).data.boards.life;for(const category of ['won','gain','reincarnation']){assert.equal(b[category].items.length,100);assert.equal(b[category].entry,null);assert.ok(b[category].items.every(row=>!row.isOwn));}
 });
 test('a rank-query failure after the committed score recovers on retry without a second score or completion',async()=>{
  const a=setup(),p=await a.player('恢復測試'),s=await a.start(p),prepare=a.DB.prepare;let failed=false;
- a.DB.prepare=sql=>{const q=prepare(sql);if(!sql.startsWith('WITH eligible'))return q;return {...q,bind(...args){const bound=q.bind(...args);return {...bound,async all(){if(!failed){failed=true;throw Error('temporary ranking read failure');}return bound.all();}};}};};
+ a.DB.prepare=sql=>{const q=prepare(sql);if(!sql.includes('FROM sf_leaderboard_top100 b JOIN'))return q;return {...q,bind(...args){const bound=q.bind(...args);return {...bound,async all(){if(!failed){failed=true;throw Error('temporary ranking read failure');}return bound.all();}};}};};
  const res=await handle(new Request('https://api.test/v1/scores',{method:'POST',headers:{Origin:'https://player.github.io','Content-Type':'application/json',Authorization:'Bearer '+p.playerToken},body:JSON.stringify(score(s))}),{DB:a.DB,RATE_LIMIT_SECRET:'profile-tests',ALLOWED_ORIGINS:'https://player.github.io'});assert.equal(res.status,500);
  a.DB.prepare=prepare;assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_runs').get().n,1);
  const retry=await a.call('/v1/scores',score(s),p);assert.equal(retry.status,409);assert.equal(retry.data.error.receipt.submitted,true);assert.equal(a.DB.db.prepare('SELECT COUNT(*) n FROM sf_life_completions').get().n,1);
